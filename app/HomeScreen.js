@@ -1,7 +1,9 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen() {
+  const router = useRouter();
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -55,14 +57,14 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.actionContainer}>
           <TouchableOpacity 
             style={styles.primaryButton}
-            onPress={() => navigation?.navigate('Login')}
+            onPress={() => router.push('/LoginScreen')}
           >
             <Text style={styles.primaryButtonText}>Acessar Minha Conta</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.secondaryButton}
-            onPress={() => navigation?.navigate('Cadastro')}
+            onPress={() => router.push('/CadastroScreen')}
           >
             <Text style={styles.secondaryButtonText}>Criar Nova Conta</Text>
           </TouchableOpacity>

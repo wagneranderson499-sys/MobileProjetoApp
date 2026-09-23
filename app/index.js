@@ -1,17 +1,18 @@
-import React from 'react';
+
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
+
 // Import das telas de autenticação e apresentação
-import HomeScreen from './Screens/HomeScreen';
-import CadastroScreen from './Screens/CadastroScreen';
-import LoginScreen from './Screens/LoginScreen';
+import HomeScreen from './HomeScreen';
+import CadastroScreen from './CadastroScreen';
+import LoginScreen from './LoginScreen';
 
 // Import das telas internas do aplicativo (com Bottom Tabs)
-import DashboardScreen from './Screens/DashboardScreen';
+import DashboardScreen from './DashboardScreen';
 
 
 
@@ -51,8 +52,7 @@ function MainTabNavigator() {
       })}
     >
       <Tab.Screen name="Início" component={DashboardScreen} />
-      <Tab.Screen name="Histórico" component={HistoricoScreen} />
-      <Tab.Screen name="Relatórios" component={RelatoriosScreen} />
+      <Tab.Screen name="Gráfico" component={GraficoScreen} />
       <Tab.Screen name="Configurações" component={ConfiguraçõesScreen} />
     </Tab.Navigator>
   );
