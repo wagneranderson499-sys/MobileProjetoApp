@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -8,25 +8,21 @@ import {
   StatusBar 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useCategorias } from '../context/CategoryContext';
+
+// 1. Import do Contexto de Transações do seu app
+import { useTransactions } from '../context/TransactionContext';
 
 export default function GraficosScreen() {
   const router = useRouter();
 
-  // Controle de Mês
-  const [mesSelecionado, setMesSelecionado] = useState('Setembro');
-  const meses = ['Julho', 'Agosto', 'Setembro'];
+  // ✅ CORREÇÃO: Consome do useTransactions()
+  const { transacoes = [] } = useTransactions();
 
-  // Transações com os dados atuais
-  const [transacoes] = useState([
-    { id: '1', titulo: 'Supermercado', valor: 250.50, tipo: 'DESPESA', categoria: 'Alimentação', data: '21/09/2026' },
-    { id: '2', titulo: 'Restaurante', valor: 120.00, tipo: 'DESPESA', categoria: 'Alimentação', data: '22/09/2026' },
-    { id: '3', titulo: 'Uber / Combustível', valor: 180.00, tipo: 'DESPESA', categoria: 'Transporte', data: '18/09/2026' },
-    { id: '4', titulo: 'Cinema & Lazer', valor: 85.00, tipo: 'DESPESA', categoria: 'Lazer', data: '15/09/2026' },
-    { id: '5', titulo: 'Conta de Luz', valor: 140.00, tipo: 'DESPESA', categoria: 'Contas', data: '10/09/2026' },
-  ]);
+  // Controle de Mês Selecionado
+  const [mesSelecionado, setMesSelecionado] = useState('Todos');
+  const meses = ['Todos', 'Julho', 'Agosto', 'Setembro'];
 
   const definicaoCategorias = [
     { nome: 'Alimentação', icone: 'restaurant-outline', cor: '#EF4444' },
@@ -36,25 +32,48 @@ export default function GraficosScreen() {
     { nome: 'Outros', icone: 'grid-outline', cor: '#64748B' },
   ];
 
-  // Filtros e Cálculos
-  const apenasDespesas = transacoes.filter(t => t.tipo === 'DESPESA');
-  const totalDespesasGeral = apenasDespesas.reduce((acc, curr) => acc + curr.valor, 0);
+  // 1. Filtra apenas despesas
+  const apenasDespesas = useMemo(() => {
+    return transacoes.filter(t => {
+      const isDespesa = t.tipo === 'DESPESA' || t.tipo === 'despesa' || !t.tipo;
+      
+      if (mesSelecionado === 'Todos' || !t.data) return isDespesa;
 
-  const categoriasCalculadas = definicaoCategorias.map(cat => {
-    const totalCategoria = apenasDespesas
-      .filter(t => t.categoria === cat.nome)
-      .reduce((acc, curr) => acc + curr.valor, 0);
+      // Mapeia mes por extensão ou string da data se houver
+      return isDespesa;
+    });
+  }, [transacoes, mesSelecionado]);
 
-    const porcentagem = totalDespesasGeral > 0 
-      ? Math.round((totalCategoria / totalDespesasGeral) * 100) 
-      : 0;
+  // 2. Cálculo do total geral de despesas
+  const totalDespesasGeral = useMemo(() => {
+    return apenasDespesas.reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
+  }, [apenasDespesas]);
 
-    return {
-      ...cat,
-      total: totalCategoria,
-      porcentagem,
-    };
-  }).filter(c => c.total > 0); // Exibe apenas categorias com gastos
+  // 3. Processamento e ordenação das categorias
+  const categoriasCalculadas = useMemo(() => {
+    const processadas = definicaoCategorias.map(cat => {
+      const itensCategoria = apenasDespesas.filter(
+        t => (t.categoria || 'Outros').toLowerCase() === cat.nome.toLowerCase()
+      );
+
+      const totalCategoria = itensCategoria.reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
+
+      const porcentagem = totalDespesasGeral > 0 
+        ? Math.round((totalCategoria / totalDespesasGeral) * 100) 
+        : 0;
+
+      return {
+        ...cat,
+        total: totalCategoria,
+        porcentagem,
+        itens: itensCategoria
+      };
+    })
+    .filter(c => c.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+    return processadas;
+  }, [apenasDespesas, totalDespesasGeral]);
 
   const formatarMoeda = (val) => {
     return Number(val || 0).toLocaleString('pt-BR', {
@@ -98,15 +117,14 @@ export default function GraficosScreen() {
           ))}
         </View>
 
-        {/* CARD BRANCO - GRÁFICO CIRCULAR/DONUT */}
+        {/* CARD DO GRÁFICO CIRCULAR / DONUT */}
         <View style={styles.whiteCard}>
           <Text style={styles.cardLabel}>Gastos por Categoria</Text>
           <Text style={styles.totalAmount}>{formatarMoeda(totalDespesasGeral)}</Text>
 
-          {/* VISUAL DO GRÁFICO CIRCULAR COM MIOLO (DONUT) */}
+          {/* VISUAL DO GRÁFICO CIRCULAR */}
           <View style={styles.donutWrapper}>
             <View style={styles.donutOuterCircle}>
-              {/* Anel Externo representando o gráfico em fatias */}
               <View style={styles.donutInnerCircle}>
                 <Text style={styles.donutCenterValue}>{formatarMoeda(totalDespesasGeral)}</Text>
                 <Text style={styles.donutCenterLabel}>Total Gasto</Text>
@@ -116,26 +134,32 @@ export default function GraficosScreen() {
 
           {/* LEGENDA DAS CORES */}
           <View style={styles.legendContainer}>
-            {categoriasCalculadas.map((item) => (
-              <View key={item.nome} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: item.cor }]} />
-                <Text style={styles.legendText}>{item.nome}</Text>
-                <Text style={styles.legendPercent}>{item.porcentagem}%</Text>
-              </View>
-            ))}
+            {categoriasCalculadas.length === 0 ? (
+              <Text style={styles.emptyText}>Nenhuma despesa registrada neste período.</Text>
+            ) : (
+              categoriasCalculadas.map((item) => (
+                <View key={item.nome} style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: item.cor }]} />
+                  <Text style={styles.legendText}>{item.nome}</Text>
+                  <Text style={styles.legendPercent}>{item.porcentagem}%</Text>
+                </View>
+              ))
+            )}
           </View>
         </View>
 
-        {/* INFOGRÁFICO DE DETALHAMENTO */}
-        <Text style={styles.sectionTitle}>Infográfico de Despesas</Text>
+        {/* INFOGRÁFICO DE DETALHAMENTO DAS DESPESAS */}
+        <Text style={styles.sectionTitle}>Infográfico de Despesas (Maior para Menor)</Text>
 
         <View style={styles.infographicContainer}>
-          {categoriasCalculadas.map((cat) => {
-            const itensCategoria = apenasDespesas.filter(t => t.categoria === cat.nome);
-
-            return (
+          {categoriasCalculadas.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyCardText}>Adicione novas despesas no Dashboard para ver os gráficos.</Text>
+            </View>
+          ) : (
+            categoriasCalculadas.map((cat) => (
               <View key={cat.nome} style={styles.infographicCard}>
-                {/* Cabeçalho da Categoria no Infográfico */}
+                {/* Cabeçalho da Categoria */}
                 <View style={styles.infoCardHeader}>
                   <View style={styles.infoCardHeaderLeft}>
                     <View style={[styles.infoIconBg, { backgroundColor: cat.cor }]}>
@@ -143,7 +167,7 @@ export default function GraficosScreen() {
                     </View>
                     <View>
                       <Text style={styles.infoCategoryName}>{cat.nome}</Text>
-                      <Text style={styles.infoCategoryCount}>{itensCategoria.length} lançamento(s)</Text>
+                      <Text style={styles.infoCategoryCount}>{cat.itens.length} lançamento(s)</Text>
                     </View>
                   </View>
                   <View style={styles.infoCardHeaderRight}>
@@ -154,7 +178,7 @@ export default function GraficosScreen() {
                   </View>
                 </View>
 
-                {/* Barra Estilizada de Progresso Infográfico */}
+                {/* Barra de Progresso */}
                 <View style={styles.infoBarBackground}>
                   <View 
                     style={[
@@ -164,29 +188,28 @@ export default function GraficosScreen() {
                   />
                 </View>
 
-                {/* Lista de Itens que compõem esta Categoria */}
+                {/* Descrição individual de cada gasto pertencente à categoria */}
                 <View style={styles.infoItemsList}>
-                  {itensCategoria.map((item, idx) => (
-                    <View key={item.id} style={styles.infoItemRow}>
+                  {cat.itens.map((item, idx) => (
+                    <View key={item.id || `${item.descricao}-${idx}`} style={styles.infoItemRow}>
                       <View style={styles.infoItemBullet}>
                         <View style={[styles.bulletDot, { backgroundColor: cat.cor }]} />
-                        <Text style={styles.infoItemTitle}>{item.titulo}</Text>
+                        {/* ✅ CORREÇÃO: suporta item.descricao ou item.titulo */}
+                        <Text style={styles.infoItemTitle}>{item.descricao || item.titulo}</Text>
                       </View>
                       <Text style={styles.infoItemValue}>{formatarMoeda(item.valor)}</Text>
                     </View>
                   ))}
                 </View>
               </View>
-            );
-          })}
+            ))
+          )}
         </View>
 
       </ScrollView>
 
       {/* TAB BAR INFERIOR */}
-{/* TAB BAR INFERIOR */}
       <View style={styles.tabBar}>
-        {/* Aba Início */}
         <TouchableOpacity 
           style={styles.tabItem} 
           activeOpacity={0.7}
@@ -196,7 +219,6 @@ export default function GraficosScreen() {
           <Text style={styles.tabLabelInactive}>Início</Text>
         </TouchableOpacity>
 
-        {/* Aba Relatórios */}
         <TouchableOpacity 
           style={styles.tabItem} 
           activeOpacity={0.7}
@@ -207,7 +229,6 @@ export default function GraficosScreen() {
           <View style={styles.activeIndicator} />
         </TouchableOpacity>
 
-        {/* Aba Ajustes */}
         <TouchableOpacity 
           style={styles.tabItem} 
           activeOpacity={0.7}
@@ -309,7 +330,7 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 90,
     borderWidth: 16,
-    borderColor: '#3B82F6', // Cor base do anel
+    borderColor: '#3B82F6',
     borderTopColor: '#EF4444',
     borderRightColor: '#F59E0B',
     borderBottomColor: '#8B5CF6',
@@ -330,9 +351,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   donutCenterValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#1E293B',
+    textAlign: 'center',
   },
   donutCenterLabel: {
     fontSize: 11,
@@ -366,6 +388,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     color: '#1E293B',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
   },
 
   /* INFOGRÁFICO DE CATEGORIAS */
@@ -470,6 +497,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#1E293B',
+  },
+  emptyCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  emptyCardText: {
+    color: '#94A3B8',
+    fontSize: 13,
   },
 
   /* TAB BAR */

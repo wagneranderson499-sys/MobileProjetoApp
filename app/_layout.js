@@ -1,10 +1,17 @@
+// app/_layout.js
+import React from 'react';
 import { Stack } from 'expo-router';
-import { CategoryProvider } from '../context/CategoryContext';
+
+// 1. Verifique se a importação está exatamente assim com chaves { CategoryProvider }:
+import { CategoryProvider } from '../context/CategoryContext'; 
+import { TransactionProvider } from '../context/TransactionContext';
 
 export default function Layout() {
   return (
     <CategoryProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <TransactionProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </TransactionProvider>
     </CategoryProvider>
   );
 }

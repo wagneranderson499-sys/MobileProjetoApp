@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,23 +12,110 @@ import {
   Image,
   Modal,
   TextInput,
-  FlatList
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCategorias } from '../context/CategoryContext';
 
 export default function ConfiguracaoScreen() {
   const [notificacoes, setNotificacoes] = useState(true);
-  const [biometria, setBiometria] = useState(false);
-  
+
+  // Dados do Usuário Logado
+  const [usuario, setUsuario] = useState(null);
+
+  // Modais de Edição de Perfil e Alteração de Senha
+  const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
+  const [nomeEdit, setNomeEdit] = useState('');
+  const [emailEdit, setEmailEdit] = useState('');
+
+  const [modalSenhaVisible, setModalSenhaVisible] = useState(false);
+  const [senhaAtual, setSenhaAtual] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
+
   // Contexto Global de Categorias
   const { categorias, adicionarCategoria, removerCategoria } = useCategorias();
   
-  // Estado para controle do Modal de Categorias
-  const [modalVisible, setModalVisible] = useState(false);
+  // Modal de Categorias
+  const [modalCategoryVisible, setModalCategoryVisible] = useState(false);
   const [novaCategoria, setNovaCategoria] = useState('');
 
+  // Recarrega os dados do usuário sempre que a tela de Ajustes entrar em foco
+  useFocusEffect(
+    useCallback(() => {
+      async function carregarUsuario() {
+        try {
+          const userJson = await AsyncStorage.getItem('@usuario_logado');
+          if (userJson) {
+            const user = JSON.parse(userJson);
+            setUsuario(user);
+            setNomeEdit(user.nome || '');
+            setEmailEdit(user.email || '');
+          }
+        } catch (error) {
+          console.error('Erro ao carregar usuário:', error);
+        }
+      }
+      carregarUsuario();
+    }, [])
+  );
+
+  // Salvar alterações de Nome e E-mail do Usuário
+  const handleSalvarPerfil = async () => {
+    if (!nomeEdit.trim() || !emailEdit.trim()) {
+      Alert.alert('Erro', 'Por favor, preencha nome e e-mail.');
+      return;
+    }
+
+    try {
+      const usuarioAtualizado = { ...usuario, nome: nomeEdit, email: emailEdit };
+      await AsyncStorage.setItem('@usuario_logado', JSON.stringify(usuarioAtualizado));
+      setUsuario(usuarioAtualizado);
+      setModalPerfilVisible(false);
+      Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível salvar as alterações.');
+    }
+  };
+
+  // Alterar Senha com Validação
+  const handleAlterarSenha = async () => {
+    if (!senhaAtual || !novaSenha || !confirmarSenha) {
+      Alert.alert('Atenção', 'Preencha todos os campos da senha.');
+      return;
+    }
+
+    if (novaSenha !== confirmarSenha) {
+      Alert.alert('Erro', 'A nova senha e a confirmação não coincidem.');
+      return;
+    }
+
+    if (usuario?.senha && senhaAtual !== usuario.senha) {
+      Alert.alert('Erro', 'A senha atual está incorreta.');
+      return;
+    }
+
+    try {
+      const usuarioAtualizado = { ...usuario, senha: novaSenha };
+      await AsyncStorage.setItem('@usuario_logado', JSON.stringify(usuarioAtualizado));
+      setUsuario(usuarioAtualizado);
+      setSenhaAtual('');
+      setNovaSenha('');
+      setConfirmarSenha('');
+      setModalSenhaVisible(false);
+      Alert.alert('Sucesso', 'Senha alterada com sucesso!');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível alterar a senha.');
+    }
+  };
+
+  // Gerenciamento de Categorias
   const handleAdicionar = () => {
     if (!novaCategoria.trim()) {
       Alert.alert('Atenção', 'Digite o nome da categoria.');
@@ -36,12 +123,13 @@ export default function ConfiguracaoScreen() {
     }
     adicionarCategoria(novaCategoria);
     setNovaCategoria('');
+    Keyboard.dismiss();
   };
 
   const handleRemover = (id, nome) => {
     Alert.alert(
       'Excluir Categoria',
-      `Deseja remover a categoria "${nome}"? Ela também será removida da Tela Inicial.`,
+      `Deseja remover a categoria "${nome}"?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Excluir', style: 'destructive', onPress: () => removerCategoria(id) }
@@ -49,10 +137,18 @@ export default function ConfiguracaoScreen() {
     );
   };
 
+  // Sair do Aplicativo
   const handleSair = () => {
     Alert.alert('Sair da Conta', 'Tem certeza que deseja encerrar a sessão?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => console.log('Sessão encerrada') },
+      { 
+        text: 'Sair', 
+        style: 'destructive', 
+        onPress: async () => {
+          await AsyncStorage.removeItem('@usuario_logado');
+          router.replace('/LoginScreen');
+        } 
+      },
     ]);
   };
 
@@ -67,17 +163,17 @@ export default function ConfiguracaoScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* CARD PERFIL */}
+        {/* CARD PERFIL DINÂMICO */}
         <View style={styles.profileCard}>
           <Image
-            source={{ uri: 'https://avatar.iran.liara.run/public/boy' }}
+            source={{ uri: `https://avatar.iran.liara.run/public/username?username=${usuario?.nome || 'User'}` }}
             style={styles.avatar}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.userName}>João Silva</Text>
-            <Text style={styles.userEmail}>joao.silva@email.com</Text>
+            <Text style={styles.userName}>{usuario?.nome || 'Usuário Logado'}</Text>
+            <Text style={styles.userEmail}>{usuario?.email || 'email@exemplo.com'}</Text>
           </View>
-          <TouchableOpacity style={styles.editButton}>
+          <TouchableOpacity style={styles.editButton} onPress={() => setModalPerfilVisible(true)}>
             <Ionicons name="pencil" size={18} color="#162D50" />
           </TouchableOpacity>
         </View>
@@ -85,7 +181,7 @@ export default function ConfiguracaoScreen() {
         {/* SEÇÃO 1: GERENCIAMENTO */}
         <Text style={styles.sectionTitle}>Gerenciamento</Text>
         <View style={styles.optionsCard}>
-          <TouchableOpacity style={styles.optionRow} onPress={() => setModalVisible(true)}>
+          <TouchableOpacity style={styles.optionRow} onPress={() => setModalCategoryVisible(true)}>
             <View style={styles.optionLeft}>
               <Ionicons name="pricetags-outline" size={22} color="#162D50" />
               <Text style={styles.optionText}>Gerenciar Categorias</Text>
@@ -95,10 +191,10 @@ export default function ConfiguracaoScreen() {
 
           <View style={styles.divider} />
 
-          <TouchableOpacity style={styles.optionRow}>
+          <TouchableOpacity style={styles.optionRow} onPress={() => setModalSenhaVisible(true)}>
             <View style={styles.optionLeft}>
-              <Ionicons name="person-outline" size={22} color="#162D50" />
-              <Text style={styles.optionText}>Dados Pessoais</Text>
+              <Ionicons name="key-outline" size={22} color="#162D50" />
+              <Text style={styles.optionText}>Redefinir Senha</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
           </TouchableOpacity>
@@ -119,21 +215,6 @@ export default function ConfiguracaoScreen() {
               thumbColor="#FFFFFF"
             />
           </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.optionRow}>
-            <View style={styles.optionLeft}>
-              <Ionicons name="finger-print-outline" size={22} color="#162D50" />
-              <Text style={styles.optionText}>Segurança / Biometria</Text>
-            </View>
-            <Switch
-              value={biometria}
-              onValueChange={setBiometria}
-              trackColor={{ false: '#CBD5E1', true: '#10B981' }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
         </View>
 
         {/* SAIR DO APP */}
@@ -144,83 +225,91 @@ export default function ConfiguracaoScreen() {
 
       </ScrollView>
 
-      {/* MODAL DE CATEGORIAS */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Categorias Personalizadas</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#0F172A" />
-              </TouchableOpacity>
-            </View>
-
-            {/* INPUT DE ADICIONAR */}
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Nova categoria..."
-                placeholderTextColor="#94A3B8"
-                value={novaCategoria}
-                onChangeText={setNovaCategoria}
-              />
-              <TouchableOpacity style={styles.addButton} onPress={handleAdicionar}>
-                <Ionicons name="add" size={22} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            {/* LISTA DE CATEGORIAS */}
-            <FlatList
-              data={categorias}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.categoryItem}>
-                  <View style={styles.categoryItemLeft}>
-                    <Ionicons name={item.icone || 'pricetag-outline'} size={20} color="#162D50" />
-                    <Text style={styles.categoryName}>{item.nome}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => handleRemover(item.id, item.nome)}>
-                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
+      {/* MODAL: CATEGORIAS (TRATADO CONTRA O TECLADO) */}
+      <Modal visible={modalCategoryVisible} animationType="slide" transparent={true}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ width: '100%' }}
+            >
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Categorias Personalizadas</Text>
+                  <TouchableOpacity onPress={() => setModalCategoryVisible(false)}>
+                    <Ionicons name="close" size={24} color="#0F172A" />
                   </TouchableOpacity>
                 </View>
-              )}
-              ItemSeparatorComponent={() => <View style={styles.divider} />}
-              style={{ maxHeight: 300 }}
-            />
+
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nova categoria..."
+                    placeholderTextColor="#94A3B8"
+                    value={novaCategoria}
+                    onChangeText={setNovaCategoria}
+                  />
+                  <TouchableOpacity style={styles.addButton} onPress={handleAdicionar}>
+                    <Ionicons name="add" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+
+                <FlatList
+                  data={categorias}
+                  keyExtractor={(item) => item.id.toString()}
+                  extraData={categorias} // Garante a re-renderização imediata ao mudar o array
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => (
+                    <View style={styles.categoryItem}>
+                      <View style={styles.categoryItemLeft}>
+                        <Ionicons name={item.icone || 'pricetag-outline'} size={20} color="#162D50" />
+                        <Text style={styles.categoryName}>{item.nome}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleRemover(item.id, item.nome)}>
+                        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  ItemSeparatorComponent={() => <View style={styles.divider} />}
+                  style={{ maxHeight: 250 }}
+                />
+              </View>
+            </KeyboardAvoidingView>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* TAB BAR PADRONIZADA */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          activeOpacity={0.7}
-          onPress={() => router.push('/DashboardScreen')}
-        >
-          <Ionicons name="home-outline" size={22} color="#94A3B8" />
-          <Text style={styles.tabLabelInactive}>Início</Text>
-        </TouchableOpacity>
+      {/* TAB BAR PADRONIZADA */}
+<View style={styles.tabBar}>
+  <TouchableOpacity 
+    style={styles.tabItem} 
+    activeOpacity={0.7}
+    onPress={() => router.push('/DashboardScreen')}
+  >
+    <Ionicons name="home-outline" size={22} color="#94A3B8" />
+    <Text style={styles.tabLabelInactive}>Início</Text>
+  </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          activeOpacity={0.7}
-          onPress={() => router.push('/GraficoScreen')}
-        >
-          <Ionicons name="stats-chart" size={22} color="#94A3B8" />
-          <Text style={styles.tabLabelInactive}>Gráficos</Text>
-        </TouchableOpacity>
+  <TouchableOpacity 
+    style={styles.tabItem} 
+    activeOpacity={0.7}
+    onPress={() => router.push('/GraficoScreen')}
+  >
+    <Ionicons name="stats-chart-outline" size={22} color="#94A3B8" />
+    <Text style={styles.tabLabelInactive}>Gráficos</Text>
+  </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          activeOpacity={0.7}
-          onPress={() => router.push('/ConfiguracaoScreen')}
-        >
-          <Ionicons name="settings" size={22} color="#10B981" />
-          <Text style={styles.tabLabelActive}>Ajustes</Text>
-          <View style={styles.activeIndicator} />
-        </TouchableOpacity>
-      </View>
+  <TouchableOpacity 
+    style={styles.tabItem} 
+    activeOpacity={0.7}
+    onPress={() => router.push('/ConfiguracaoScreen')}
+  >
+    <Ionicons name="settings" size={22} color="#10B981" />
+    <Text style={styles.tabLabelActive}>Ajustes</Text>
+    <View style={styles.activeIndicator} />
+  </TouchableOpacity>
+</View>
     </SafeAreaView>
   );
 }
@@ -228,7 +317,7 @@ export default function ConfiguracaoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#162D50', // Fundo Geral Azul
+    backgroundColor: '#162D50',
   },
   headerArea: {
     backgroundColor: '#162D50',
@@ -249,7 +338,7 @@ const styles = StyleSheet.create({
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF', // Card Branco
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
     marginBottom: 24,
@@ -284,12 +373,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#FFFFFF', // Título em Branco
+    color: '#FFFFFF',
     marginBottom: 10,
     marginLeft: 4,
   },
   optionsCard: {
-    backgroundColor: '#FFFFFF', // Card Branco
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingHorizontal: 16,
     marginBottom: 20,
@@ -330,7 +419,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  /* MODAL CATEGORIAS */
+  /* MODAIS */
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -341,7 +430,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    minHeight: 400,
+    minHeight: 320,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -392,19 +481,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  /* TAB BAR */
+  /* TAB BAR PADRONIZADA (AZUL ESCURO) */
   tabBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     height: 65,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A', // Cor alterada de #FFFFFF para o azul escuro
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: 'rgba(255, 255, 255, 0.1)', // Borda sutil para fundo escuro
     paddingBottom: 8,
     paddingTop: 6,
   },
@@ -415,12 +504,12 @@ const styles = StyleSheet.create({
   },
   tabLabelInactive: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: '#94A3B8', // Cinza claro para itens inativos
     marginTop: 3,
   },
   tabLabelActive: {
     fontSize: 11,
-    color: '#10B981',
+    color: '#10B981', // Verde de destaque para a aba ativa
     fontWeight: 'bold',
     marginTop: 3,
   },

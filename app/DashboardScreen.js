@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -8,31 +8,48 @@ import {
   StatusBar,
   Modal,
   TextInput,
-  Alert
+  Alert,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTransactions } from '../context/TransactionContext';
+import { useCategorias } from '../context/CategoryContext'; // Ajuste o caminho relativo
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { nome, saldo: saldoInicial } = useLocalSearchParams();
+  const params = useLocalSearchParams();
 
-  // Estados dos Dados Financeiros
-  const [transacoes, setTransacoes] = useState([
-    { id: '1', titulo: 'Salário', valor: 3500.00, tipo: 'RECEITA', categoria: 'Renda', data: '20/09/2026' },
-    { id: '2', titulo: 'Supermercado', valor: 250.50, tipo: 'DESPESA', categoria: 'Alimentação', data: '21/09/2026' },
-    { id: '3', titulo: 'Assinatura Stream', valor: 39.90, tipo: 'DESPESA', categoria: 'Lazer', data: '22/09/2026' },
-  ]);
+  // Consumo do Contexto Global de Transações
+  const { transacoes, adicionarTransacao, removerTransacao } = useTransactions();
 
+  // 1. Tratamento do Nome do Usuário
+  const usuarioObjeto = useMemo(() => {
+    if (params.usuario) {
+      try {
+        return typeof params.usuario === 'string' ? JSON.parse(params.usuario) : params.usuario;
+      } catch (e) {
+        console.error('Erro ao converter JSON de usuario:', e);
+      }
+    }
+    return null;
+  }, [params.usuario]);
+
+  const nomeUsuario = usuarioObjeto?.nome || params.nome || 'Anderson Wagner';
+
+  // Categorias disponíveis
+// ✅ COLOQUE ISTO NO LUGAR:
+const { categorias } = useCategorias();
   // Modal e Formulário
   const [modalVisivel, setModalVisivel] = useState(false);
   const [tipoTransacao, setTipoTransacao] = useState('RECEITA'); // 'RECEITA' ou 'DESPESA'
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
-  const [categoria, setCategoria] = useState('Alimentação');
-
-  const categoriasDisponiveis = ['Alimentação', 'Transporte', 'Lazer', 'Contas', 'Outros'];
+  const [categoria, setCategoria] = useState('');
 
   // Cálculos Automáticos de Finanças
   const totalReceitas = transacoes
@@ -43,7 +60,7 @@ export default function DashboardScreen() {
     .filter(t => t.tipo === 'DESPESA')
     .reduce((acc, curr) => acc + curr.valor, 0);
 
-  const saldoAtual = Number(saldoInicial || 0) + totalReceitas - totalDespesas;
+  const saldoAtual = totalReceitas - totalDespesas;
 
   const formatarMoeda = (val) => {
     return Number(val || 0).toLocaleString('pt-BR', {
@@ -52,26 +69,30 @@ export default function DashboardScreen() {
     });
   };
 
-  // Abrir Modal
-  const abrirModal = (tipo) => {
-    setTipoTransacao(tipo);
-    setDescricao('');
-    setValor('');
-    setCategoria('Alimentação');
-    setModalVisivel(true);
-  };
+ // Abrir Modal
+const abrirModal = (tipo) => {
+  setTipoTransacao(tipo);
+  setDescricao('');
+  setValor('');
+  
+  // Define a primeira categoria dinâmica como padrão ao abrir o modal
+  const primeiraCategoria = categorias.length > 0 ? categorias[0].nome : 'Outros';
+  setCategoria(primeiraCategoria);
+  
+  setModalVisivel(true);
+};
 
   // Salvar Nova Transação
-  const handleSalvarTransacao = () => {
+  const handleSalvarTransacao = async () => {
     const valorNumerico = parseFloat(valor.replace(',', '.'));
-
-    if (!descricao.trim()) {
-      Alert.alert('Atenção', 'Informe a descrição da transação.');
-      return;
-    }
 
     if (isNaN(valorNumerico) || valorNumerico <= 0) {
       Alert.alert('Atenção', 'Informe um valor válido maior que zero.');
+      return;
+    }
+
+    if (tipoTransacao === 'DESPESA' && !descricao.trim()) {
+      Alert.alert('Atenção', 'Informe a descrição da despesa.');
       return;
     }
 
@@ -79,15 +100,16 @@ export default function DashboardScreen() {
     const dataFormatada = `${hoje.getDate().toString().padStart(2, '0')}/${(hoje.getMonth() + 1).toString().padStart(2, '0')}/${hoje.getFullYear()}`;
 
     const novaTransacao = {
-      id: Date.now().toString(),
-      titulo: descricao.trim(),
+      titulo: tipoTransacao === 'RECEITA' ? 'Receita' : descricao.trim(),
       valor: valorNumerico,
       tipo: tipoTransacao,
       categoria: tipoTransacao === 'DESPESA' ? categoria : 'Receita',
       data: dataFormatada,
     };
 
-    setTransacoes([novaTransacao, ...transacoes]);
+    if (adicionarTransacao) {
+      await adicionarTransacao(novaTransacao);
+    }
     setModalVisivel(false);
   };
 
@@ -101,8 +123,10 @@ export default function DashboardScreen() {
         { 
           text: 'Excluir', 
           style: 'destructive', 
-          onPress: () => {
-            setTransacoes(transacoes.filter(t => t.id !== id));
+          onPress: async () => {
+            if (removerTransacao) {
+              await removerTransacao(id);
+            }
           } 
         },
       ]
@@ -116,8 +140,8 @@ export default function DashboardScreen() {
       {/* CABEÇALHO */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greetingText}>Bem-vindo de volta,</Text>
-          <Text style={styles.userNameText}>{nome || 'Usuário'}</Text>
+          <Text style={styles.greetingText}>Bem-vindo</Text>
+          <Text style={styles.userNameText}>{nomeUsuario}</Text>
         </View>
         <TouchableOpacity 
           style={styles.logoutButton} 
@@ -130,7 +154,7 @@ export default function DashboardScreen() {
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         
-        {/* CARD PRINCIPAL EM BRANCO - SALDO TOTAL */}
+        {/* CARD PRINCIPAL - SALDO TOTAL */}
         <View style={styles.whiteCard}>
           <Text style={styles.mainCardLabel}>Saldo Total</Text>
           <Text style={styles.mainCardBalance}>{formatarMoeda(saldoAtual)}</Text>
@@ -161,7 +185,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* BOTOES DE AÇÃO RÁPIDA (RECEITA E DESPESA) */}
+        {/* BOTÕES DE AÇÃO RÁPIDA */}
         <Text style={styles.sectionTitle}>Ações Rápidas</Text>
         <View style={styles.quickActionsRow}>
           <TouchableOpacity 
@@ -187,7 +211,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* LISTA DE ÚLTIMAS TRANSAÇÕES EM CARD BRANCO */}
+        {/* LISTA DE ÚLTIMAS TRANSAÇÕES */}
         <Text style={styles.sectionTitle}>Últimas Transações</Text>
 
         <View style={styles.whiteCardTransactions}>
@@ -195,7 +219,7 @@ export default function DashboardScreen() {
             <Text style={styles.emptyText}>Nenhuma transação cadastrada.</Text>
           ) : (
             transacoes.map((item, index) => (
-              <View key={item.id}>
+              <View key={item.id || index.toString()}>
                 <View style={styles.transactionRow}>
                   <View style={styles.transactionLeft}>
                     <View style={[
@@ -210,7 +234,7 @@ export default function DashboardScreen() {
                     </View>
                     <View>
                       <Text style={styles.transactionTitle}>{item.titulo}</Text>
-                      <Text style={styles.transactionSub}>{item.categoria} • {item.data}</Text>
+                      <Text style={styles.transactionSub}>{`${item.categoria} • ${item.data}`}</Text>
                     </View>
                   </View>
 
@@ -245,76 +269,95 @@ export default function DashboardScreen() {
         animationType="slide"
         onRequestClose={() => setModalVisivel(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {tipoTransacao === 'RECEITA' ? 'Adicionar Receita' : 'Adicionar Despesa'}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisivel(false)}>
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Nome / Descrição */}
-            <Text style={styles.inputLabel}>Descrição</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder={tipoTransacao === 'RECEITA' ? "Ex: Salário, Freelance..." : "Ex: Supermercado, Conta de Luz..."}
-              placeholderTextColor="#94A3B8"
-              value={descricao}
-              onChangeText={setDescricao}
-            />
-
-            {/* Valor */}
-            <Text style={styles.inputLabel}>Valor (R$)</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="0,00"
-              placeholderTextColor="#94A3B8"
-              keyboardType="numeric"
-              value={valor}
-              onChangeText={setValor}
-            />
-
-            {/* Categoria (Apenas para Despesa) */}
-            {tipoTransacao === 'DESPESA' && (
-              <>
-                <Text style={styles.inputLabel}>Categoria</Text>
-                <View style={styles.categoryContainer}>
-                  {categoriasDisponiveis.map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[
-                        styles.categoryChip,
-                        categoria === cat && styles.categoryChipSelected
-                      ]}
-                      onPress={() => setCategoria(cat)}
-                    >
-                      <Text style={[
-                        styles.categoryText,
-                        categoria === cat && styles.categoryTextSelected
-                      ]}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {/* Botão de Salvar */}
-            <TouchableOpacity 
-              style={[
-                styles.saveButton, 
-                { backgroundColor: tipoTransacao === 'RECEITA' ? '#10B981' : '#EF4444' }
-              ]} 
-              onPress={handleSalvarTransacao}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.modalContentWrapper}
             >
-              <Text style={styles.saveButtonText}>Salvar {tipoTransacao === 'RECEITA' ? 'Receita' : 'Despesa'}</Text>
-            </TouchableOpacity>
+              <View style={styles.modalContainer}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    {tipoTransacao === 'RECEITA' ? 'Adicionar Receita' : 'Adicionar Despesa'}
+                  </Text>
+                  <TouchableOpacity onPress={() => setModalVisivel(false)}>
+                    <Ionicons name="close" size={24} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Descrição apenas para Despesas */}
+                {tipoTransacao === 'DESPESA' && (
+                  <>
+                    <Text style={styles.inputLabel}>Descrição</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Ex: Supermercado, Conta de Luz..."
+                      placeholderTextColor="#94A3B8"
+                      value={descricao}
+                      onChangeText={setDescricao}
+                      returnKeyType="done"
+                    />
+                  </>
+                )}
+
+                {/* Valor para ambas as opções */}
+                <Text style={styles.inputLabel}>Valor (R$)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="0,00"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="numeric"
+                  value={valor}
+                  onChangeText={setValor}
+                  returnKeyType="done"
+                />
+
+                {/* Categorias apenas para Despesas */}
+                {tipoTransacao === 'DESPESA' && (
+                  <>
+                   {/* O QUE ESTÁ HOJE NO SEU CÓDIGO (por volta da linha 318-335) */}
+{/* CÓDIGO ATUALIZADO */}
+<Text style={styles.inputLabel}>Categoria</Text>
+<View style={styles.categoryContainer}>
+  {categorias.map((cat) => {
+    const nomeCategoria = typeof cat === 'object' ? cat.nome : cat;
+    const keyCategoria = typeof cat === 'object' ? cat.id : cat;
+
+    return (
+      <TouchableOpacity
+        key={keyCategoria}
+        style={[
+          styles.categoryChip, // Mantenha a mesma classe de estilo do seu projeto original
+          categoria === nomeCategoria && styles.categoryChipActive,
+        ]}
+        onPress={() => setCategoria(nomeCategoria)}
+      >
+        <Text style={categoria === nomeCategoria ? styles.categoryTextActive : styles.categoryText}>
+          {nomeCategoria}
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+</View>
+                  </>
+                )}
+
+                {/* Botão de Salvar */}
+                <TouchableOpacity 
+                  style={[
+                    styles.saveButton, 
+                    { backgroundColor: tipoTransacao === 'RECEITA' ? '#10B981' : '#EF4444' }
+                  ]} 
+                  onPress={handleSalvarTransacao}
+                >
+                  <Text style={styles.saveButtonText}>
+                    Salvar {tipoTransacao === 'RECEITA' ? 'Receita' : 'Despesa'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* TAB BAR INFERIOR */}
@@ -328,7 +371,10 @@ export default function DashboardScreen() {
         <TouchableOpacity 
           style={styles.tabItem} 
           activeOpacity={0.7}
-          onPress={() => router.push('/GraficoScreen')}
+          onPress={() => router.push({
+            pathname: '/GraficoScreen',
+            params: { nome: nomeUsuario }
+          })}
         >
           <Ionicons name="stats-chart-outline" size={22} color="#94A3B8" />
           <Text style={styles.tabLabelInactive}>Gráfico</Text>
@@ -383,8 +429,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 90,
   },
-
-  /* CARDS BRANCOS */
   whiteCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -444,15 +488,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#EF4444',
   },
-
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#F8FAFC',
     marginBottom: 12,
   },
-
-  /* AÇÕES RÁPIDAS BRANCAS */
   quickActionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -483,8 +524,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
   },
-
-  /* LISTA TRANSAÇÕES BRANCA */
   whiteCardTransactions: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -545,12 +584,13 @@ const styles = StyleSheet.create({
   deleteButton: {
     padding: 4,
   },
-
-  /* MODAL STYLES */
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+  },
+  modalContentWrapper: {
+    width: '100%',
   },
   modalContainer: {
     backgroundColor: '#FFFFFF',
@@ -620,8 +660,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-
-  /* TAB BAR */
   tabBar: {
     position: 'absolute',
     bottom: 0,
