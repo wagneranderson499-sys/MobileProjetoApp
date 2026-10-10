@@ -1,702 +1,1738 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  ScrollView, 
-  TouchableOpacity, 
-  StatusBar,
+import React, { useState } from 'react';
+
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TouchableOpacity,
   Modal,
   TextInput,
   Alert,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback,
+  Platform,
   Keyboard,
-  Platform
+  StatusBar,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+
 import { useTransactions } from '../context/TransactionContext';
-import { useCategorias } from '../context/CategoryContext'; // Ajuste o caminho relativo
+import { useCategorias } from '../context/CategoryContext';
 
 export default function DashboardScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams();
 
-  // Consumo do Contexto Global de Transações
-  const { transacoes, adicionarTransacao, removerTransacao } = useTransactions();
+  const {
+    transacoes,
+    adicionarTransacao,
+    removerTransacao,
+  } = useTransactions();
 
-  // 1. Tratamento do Nome do Usuário
-  const usuarioObjeto = useMemo(() => {
-    if (params.usuario) {
-      try {
-        return typeof params.usuario === 'string' ? JSON.parse(params.usuario) : params.usuario;
-      } catch (e) {
-        console.error('Erro ao converter JSON de usuario:', e);
-      }
-    }
-    return null;
-  }, [params.usuario]);
+  const { categorias } = useCategorias();
 
-  const nomeUsuario = usuarioObjeto?.nome || params.nome || 'Anderson Wagner';
-
-  // Categorias disponíveis
-// ✅ COLOQUE ISTO NO LUGAR:
-const { categorias } = useCategorias();
-  // Modal e Formulário
-  const [modalVisivel, setModalVisivel] = useState(false);
-  const [tipoTransacao, setTipoTransacao] = useState('RECEITA'); // 'RECEITA' ou 'DESPESA'
-  const [descricao, setDescricao] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [tipoTransacao, setTipoTransacao] = useState('receita');
   const [valor, setValor] = useState('');
-  const [categoria, setCategoria] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [categoriaSelecionada, setCategoriaSelecionada] =
+    useState(null);
 
-  // Cálculos Automáticos de Finanças
+  let usuario = null;
+
+  try {
+    if (params.usuario) {
+      usuario =
+        typeof params.usuario === 'string'
+          ? JSON.parse(params.usuario)
+          : params.usuario;
+    }
+  } catch (error) {
+    console.error('Erro ao ler usuário:', error);
+  }
+
+  const nomeUsuario =
+    usuario?.nome ||
+    params.nome ||
+    'Anderson Wagner';
+
   const totalReceitas = transacoes
-    .filter(t => t.tipo === 'RECEITA')
-    .reduce((acc, curr) => acc + curr.valor, 0);
+    .filter((item) => item.tipo === 'receita')
+    .reduce(
+      (total, item) =>
+        total + Number(item.valor || 0),
+      0
+    );
 
   const totalDespesas = transacoes
-    .filter(t => t.tipo === 'DESPESA')
-    .reduce((acc, curr) => acc + curr.valor, 0);
+    .filter((item) => item.tipo === 'despesa')
+    .reduce(
+      (total, item) =>
+        total + Number(item.valor || 0),
+      0
+    );
 
-  const saldoAtual = totalReceitas - totalDespesas;
+  const saldoAtual =
+    totalReceitas - totalDespesas;
 
-  const formatarMoeda = (val) => {
-    return Number(val || 0).toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    });
+  const formatarMoeda = (valor) => {
+    return Number(valor || 0).toLocaleString(
+      'pt-BR',
+      {
+        style: 'currency',
+        currency: 'BRL',
+      }
+    );
   };
 
- // Abrir Modal
-const abrirModal = (tipo) => {
-  setTipoTransacao(tipo);
-  setDescricao('');
-  setValor('');
-  
-  // Define a primeira categoria dinâmica como padrão ao abrir o modal
-  const primeiraCategoria = categorias.length > 0 ? categorias[0].nome : 'Outros';
-  setCategoria(primeiraCategoria);
-  
-  setModalVisivel(true);
-};
-
-  // Salvar Nova Transação
-  const handleSalvarTransacao = async () => {
-    const valorNumerico = parseFloat(valor.replace(',', '.'));
-
-    if (isNaN(valorNumerico) || valorNumerico <= 0) {
-      Alert.alert('Atenção', 'Informe um valor válido maior que zero.');
-      return;
-    }
-
-    if (tipoTransacao === 'DESPESA' && !descricao.trim()) {
-      Alert.alert('Atenção', 'Informe a descrição da despesa.');
-      return;
-    }
-
+  const obterDataAtual = () => {
     const hoje = new Date();
-    const dataFormatada = `${hoje.getDate().toString().padStart(2, '0')}/${(hoje.getMonth() + 1).toString().padStart(2, '0')}/${hoje.getFullYear()}`;
+
+    const dia = String(
+      hoje.getDate()
+    ).padStart(2, '0');
+
+    const mes = String(
+      hoje.getMonth() + 1
+    ).padStart(2, '0');
+
+    const ano = hoje.getFullYear();
+
+    return `${dia}/${mes}/${ano}`;
+  };
+
+  const abrirModal = (tipo) => {
+    setTipoTransacao(tipo);
+    setValor('');
+    setDescricao('');
+
+    if (tipo === 'despesa') {
+      setCategoriaSelecionada(
+        categorias?.[0] || null
+      );
+    } else {
+      setCategoriaSelecionada(null);
+    }
+
+    setModalVisible(true);
+  };
+
+  const fecharModal = () => {
+    Keyboard.dismiss();
+
+    setModalVisible(false);
+    setValor('');
+    setDescricao('');
+    setCategoriaSelecionada(null);
+  };
+
+  const handleSalvarTransacao = async () => {
+    const valorNumerico = Number(
+      valor
+        .replace(/\./g, '')
+        .replace(',', '.')
+    );
+
+    if (
+      !valor.trim() ||
+      isNaN(valorNumerico) ||
+      valorNumerico <= 0
+    ) {
+      Alert.alert(
+        'Atenção',
+        'Digite um valor válido.'
+      );
+      return;
+    }
+
+    if (!descricao.trim()) {
+      Alert.alert(
+        'Atenção',
+        'Digite uma pequena descrição.'
+      );
+      return;
+    }
+
+    if (
+      tipoTransacao === 'despesa' &&
+      !categoriaSelecionada
+    ) {
+      Alert.alert(
+        'Atenção',
+        'Selecione uma categoria para a despesa.'
+      );
+      return;
+    }
 
     const novaTransacao = {
-      titulo: tipoTransacao === 'RECEITA' ? 'Receita' : descricao.trim(),
-      valor: valorNumerico,
+      id: Date.now().toString(),
       tipo: tipoTransacao,
-      categoria: tipoTransacao === 'DESPESA' ? categoria : 'Receita',
-      data: dataFormatada,
+      valor: valorNumerico,
+      descricao: descricao.trim(),
+      data: obterDataAtual(),
+
+      categoria:
+        tipoTransacao === 'despesa'
+          ? categoriaSelecionada?.nome ||
+            'Outros'
+          : null,
+
+      icone:
+        tipoTransacao === 'receita'
+          ? 'arrow-up-outline'
+          : 'arrow-down-outline',
     };
 
-    if (adicionarTransacao) {
-      await adicionarTransacao(novaTransacao);
+    try {
+      await adicionarTransacao(
+        novaTransacao
+      );
+
+      Keyboard.dismiss();
+      fecharModal();
+
+      Alert.alert(
+        'Sucesso',
+        tipoTransacao === 'receita'
+          ? 'Receita adicionada com sucesso!'
+          : 'Despesa adicionada com sucesso!'
+      );
+    } catch (error) {
+      console.error(
+        'Erro ao adicionar transação:',
+        error
+      );
+
+      Alert.alert(
+        'Erro',
+        'Não foi possível salvar a transação.'
+      );
     }
-    setModalVisivel(false);
   };
 
-  // Excluir Transação
   const handleExcluirTransacao = (id) => {
     Alert.alert(
-      'Excluir Transação',
-      'Tem certeza que deseja remover este item?',
+      'Excluir transação',
+      'Tem certeza que deseja excluir esta transação?',
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Excluir', 
-          style: 'destructive', 
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+
           onPress: async () => {
-            if (removerTransacao) {
+            try {
               await removerTransacao(id);
+            } catch (error) {
+              console.error(
+                'Erro ao excluir transação:',
+                error
+              );
+
+              Alert.alert(
+                'Erro',
+                'Não foi possível excluir a transação.'
+              );
             }
-          } 
+          },
         },
       ]
     );
   };
 
+  const transacoesRecentes = [
+    ...transacoes,
+  ]
+    .reverse()
+    .slice(0, 5);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#162D50" />
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={['top', 'left', 'right']}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#FFFFFF"
+      />
 
-      {/* CABEÇALHO */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greetingText}>Bem-vindo</Text>
-          <Text style={styles.userNameText}>{nomeUsuario}</Text>
+      <View style={styles.container}>
+
+        {/* HEADER */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.welcomeText}>
+              Olá,
+            </Text>
+
+            <Text style={styles.userName}>
+              {nomeUsuario}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.headerIcon}
+            onPress={() =>
+              router.push(
+                '/ConfiguracaoScreen'
+              )
+            }
+          >
+            <Ionicons
+              name="settings-outline"
+              size={22}
+              color="#162D50"
+            />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={() => router.replace('/')}
-          activeOpacity={0.7}
+
+        {/* CONTEÚDO */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={
+            styles.scrollContent
+          }
         >
-          <Ionicons name="log-out-outline" size={22} color="#fffdfd" />
-        </TouchableOpacity>
-      </View>
+          {/* VISÃO GERAL */}
+          <Text style={styles.sectionTitle}>
+            Visão geral
+          </Text>
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        
-        {/* CARD PRINCIPAL - SALDO TOTAL */}
-        <View style={styles.whiteCard}>
-          <Text style={styles.mainCardLabel}>Saldo Total</Text>
-          <Text style={styles.mainCardBalance}>{formatarMoeda(saldoAtual)}</Text>
-
-          <View style={styles.divider} />
-
-          {/* RESUMO ENTRADAS E SAÍDAS */}
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryItem}>
-              <View style={[styles.arrowIconBg, { backgroundColor: '#ECFDF5' }]}>
-                <Feather name="arrow-up-right" size={18} color="#10B981" />
-              </View>
+          {/* CARD DO SALDO */}
+          <View style={styles.balanceCard}>
+            <View style={styles.balanceHeader}>
               <View>
-                <Text style={styles.summaryLabel}>Receitas</Text>
-                <Text style={styles.summaryIncome}>{formatarMoeda(totalReceitas)}</Text>
+                <Text
+                  style={styles.balanceLabel}
+                >
+                  SALDO TOTAL
+                </Text>
+
+                <Text
+                  style={styles.balanceTitle}
+                >
+                  Seu saldo atual
+                </Text>
+              </View>
+
+              <View style={styles.balanceIcon}>
+                <Ionicons
+                  name="wallet-outline"
+                  size={21}
+                  color="#FFFFFF"
+                />
               </View>
             </View>
 
-            <View style={styles.summaryItem}>
-              <View style={[styles.arrowIconBg, { backgroundColor: '#FEF2F2' }]}>
-                <Feather name="arrow-down-left" size={18} color="#EF4444" />
+            <Text
+              style={styles.mainCardBalance}
+            >
+              {formatarMoeda(saldoAtual)}
+            </Text>
+
+            <View style={styles.divider} />
+
+            <View
+              style={styles.balanceSummary}
+            >
+              <View
+                style={styles.summaryItem}
+              >
+                <Text
+                  style={styles.summaryLabel}
+                >
+                  RECEITAS
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryValueGreen
+                  }
+                >
+                  {formatarMoeda(
+                    totalReceitas
+                  )}
+                </Text>
               </View>
-              <View>
-                <Text style={styles.summaryLabel}>Despesas</Text>
-                <Text style={styles.summaryOutcome}>{formatarMoeda(totalDespesas)}</Text>
+
+              <View
+                style={styles.summaryItem}
+              >
+                <Text
+                  style={styles.summaryLabel}
+                >
+                  DESPESAS
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryValueRed
+                  }
+                >
+                  {formatarMoeda(
+                    totalDespesas
+                  )}
+                </Text>
               </View>
             </View>
           </View>
-        </View>
 
-        {/* BOTÕES DE AÇÃO RÁPIDA */}
-        <Text style={styles.sectionTitle}>Ações Rápidas</Text>
-        <View style={styles.quickActionsRow}>
-          <TouchableOpacity 
-            style={styles.whiteActionButton} 
-            activeOpacity={0.8}
-            onPress={() => abrirModal('RECEITA')}
-          >
-            <View style={[styles.actionIconBg, { backgroundColor: '#10B981' }]}>
-              <Feather name="plus" size={22} color="#FFFFFF" />
-            </View>
-            <Text style={styles.actionText}>Nova Receita</Text>
-          </TouchableOpacity>
+          {/* ADICIONAR LANÇAMENTO */}
+          <Text style={styles.sectionTitle}>
+            Adicionar lançamento
+          </Text>
 
-          <TouchableOpacity 
-            style={styles.whiteActionButton} 
-            activeOpacity={0.8}
-            onPress={() => abrirModal('DESPESA')}
-          >
-            <View style={[styles.actionIconBg, { backgroundColor: '#EF4444' }]}>
-              <Feather name="minus" size={22} color="#FFFFFF" />
-            </View>
-            <Text style={styles.actionText}>Nova Despesa</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* LISTA DE ÚLTIMAS TRANSAÇÕES */}
-        <Text style={styles.sectionTitle}>Últimas Transações</Text>
-
-        <View style={styles.whiteCardTransactions}>
-          {transacoes.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhuma transação cadastrada.</Text>
-          ) : (
-            transacoes.map((item, index) => (
-              <View key={item.id || index.toString()}>
-                <View style={styles.transactionRow}>
-                  <View style={styles.transactionLeft}>
-                    <View style={[
-                      styles.transactionIconBg, 
-                      { backgroundColor: item.tipo === 'RECEITA' ? '#ECFDF5' : '#FEF2F2' }
-                    ]}>
-                      <Ionicons 
-                        name={item.tipo === 'RECEITA' ? 'arrow-down' : 'arrow-up'} 
-                        size={18} 
-                        color={item.tipo === 'RECEITA' ? '#10B981' : '#EF4444'} 
-                      />
-                    </View>
-                    <View>
-                      <Text style={styles.transactionTitle}>{item.titulo}</Text>
-                      <Text style={styles.transactionSub}>{`${item.categoria} • ${item.data}`}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.transactionRight}>
-                    <Text style={[
-                      styles.transactionAmount, 
-                      { color: item.tipo === 'RECEITA' ? '#10B981' : '#EF4444' }
-                    ]}>
-                      {item.tipo === 'RECEITA' ? `+ ${formatarMoeda(item.valor)}` : `- ${formatarMoeda(item.valor)}`}
-                    </Text>
-                    
-                    <TouchableOpacity 
-                      onPress={() => handleExcluirTransacao(item.id)}
-                      style={styles.deleteButton}
-                    >
-                      <Feather name="trash-2" size={16} color="#94A3B8" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                {index < transacoes.length - 1 && <View style={styles.rowDivider} />}
-              </View>
-            ))
-          )}
-        </View>
-
-      </ScrollView>
-
-      {/* MODAL ADICIONAR RECEITA / DESPESA */}
-      <Modal
-        visible={modalVisivel}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisivel(false)}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.modalContentWrapper}
+          <View style={styles.actionsRow}>
+            {/* RECEITA */}
+            <TouchableOpacity
+              style={styles.actionCard}
+              activeOpacity={0.85}
+              onPress={() =>
+                abrirModal('receita')
+              }
             >
-              <View style={styles.modalContainer}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>
-                    {tipoTransacao === 'RECEITA' ? 'Adicionar Receita' : 'Adicionar Despesa'}
-                  </Text>
-                  <TouchableOpacity onPress={() => setModalVisivel(false)}>
-                    <Ionicons name="close" size={24} color="#64748B" />
+              <View
+                style={
+                  styles.actionIconGreen
+                }
+              >
+                <Ionicons
+                  name="arrow-up-outline"
+                  size={21}
+                  color="#FFFFFF"
+                />
+              </View>
+
+              <View
+                style={
+                  styles.actionTextContainer
+                }
+              >
+                <Text
+                  style={styles.actionText}
+                >
+                  Nova Receita
+                </Text>
+
+                <Text
+                  style={styles.actionSubtext}
+                >
+                  Adicionar entrada
+                </Text>
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color="#CBD5E1"
+              />
+            </TouchableOpacity>
+
+            {/* DESPESA */}
+            <TouchableOpacity
+              style={styles.actionCard}
+              activeOpacity={0.85}
+              onPress={() =>
+                abrirModal('despesa')
+              }
+            >
+              <View
+                style={
+                  styles.actionIconRed
+                }
+              >
+                <Ionicons
+                  name="arrow-down-outline"
+                  size={21}
+                  color="#FFFFFF"
+                />
+              </View>
+
+              <View
+                style={
+                  styles.actionTextContainer
+                }
+              >
+                <Text
+                  style={styles.actionText}
+                >
+                  Nova Despesa
+                </Text>
+
+                <Text
+                  style={styles.actionSubtext}
+                >
+                  Adicionar saída
+                </Text>
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color="#CBD5E1"
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* ÚLTIMAS TRANSAÇÕES */}
+          <View
+            style={styles.transactionsCard}
+          >
+            <View
+              style={styles.transactionsHeader}
+            >
+              <Text
+                style={
+                  styles.transactionCardTitle
+                }
+              >
+                Últimas transações
+              </Text>
+
+              <TouchableOpacity
+                onPress={() =>
+                  router.push(
+                    '/GraficoScreen'
+                  )
+                }
+              >
+                <Text
+                  style={styles.seeMore}
+                >
+                  Ver gráficos
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {transacoesRecentes.length ===
+            0 ? (
+              <View
+                style={styles.emptyContainer}
+              >
+                <View
+                  style={styles.emptyIcon}
+                >
+                  <Ionicons
+                    name="receipt-outline"
+                    size={26}
+                    color="#CBD5E1"
+                  />
+                </View>
+
+                <Text
+                  style={styles.emptyTitle}
+                >
+                  Nenhuma transação
+                </Text>
+
+                <Text
+                  style={styles.emptyText}
+                >
+                  Suas receitas e despesas
+                  aparecerão aqui.
+                </Text>
+              </View>
+            ) : (
+              transacoesRecentes.map(
+                (item, index) => {
+                  const isReceita =
+                    item.tipo === 'receita';
+
+                  return (
+                    <View
+                      key={
+                        item.id?.toString() ||
+                        index.toString()
+                      }
+                      style={[
+                        styles.transactionRow,
+
+                        index !==
+                          transacoesRecentes.length -
+                            1 &&
+                          styles.transactionBorder,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.transactionIcon,
+                          {
+                            backgroundColor:
+                              isReceita
+                                ? '#D1FAE5'
+                                : '#FEE2E2',
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            isReceita
+                              ? 'arrow-up-outline'
+                              : 'arrow-down-outline'
+                          }
+                          size={19}
+                          color={
+                            isReceita
+                              ? '#10B981'
+                              : '#EF4444'
+                          }
+                        />
+                      </View>
+
+                      <View
+                        style={
+                          styles.transactionInfo
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.transactionTitle
+                          }
+                          numberOfLines={1}
+                        >
+                          {item.descricao ||
+                            (isReceita
+                              ? 'Receita'
+                              : 'Despesa')}
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.transactionSub
+                          }
+                          numberOfLines={1}
+                        >
+                          {isReceita
+                            ? 'Receita'
+                            : item.categoria ||
+                              'Outros'}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.transactionRight
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.transactionValue,
+                            {
+                              color: isReceita
+                                ? '#10B981'
+                                : '#EF4444',
+                            },
+                          ]}
+                        >
+                          {isReceita
+                            ? '+ '
+                            : '- '}
+
+                          {formatarMoeda(
+                            item.valor
+                          )}
+                        </Text>
+
+                        <TouchableOpacity
+                          onPress={() =>
+                            handleExcluirTransacao(
+                              item.id
+                            )
+                          }
+                          style={
+                            styles.deleteButton
+                          }
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={17}
+                            color="#CBD5E1"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                }
+              )
+            )}
+          </View>
+        </ScrollView>
+
+        {/* =====================================================
+            BARRA INFERIOR
+            IDÊNTICA À TELA DE GRÁFICOS
+        ===================================================== */}
+        <View style={styles.tabBar}>
+
+          {/* INÍCIO - ATIVO */}
+          <TouchableOpacity
+            style={styles.tabItem}
+            activeOpacity={0.7}
+            onPress={() =>
+              router.replace(
+                '/DashboardScreen'
+              )
+            }
+          >
+            <View
+              style={
+                styles.activeIconContainer
+              }
+            >
+              <Ionicons
+                name="home"
+                size={21}
+                color="#162D50"
+              />
+            </View>
+
+            <Text
+              style={styles.tabLabelActive}
+            >
+              Início
+            </Text>
+
+            <View
+              style={styles.activeIndicator}
+            />
+          </TouchableOpacity>
+
+          {/* GRÁFICOS */}
+          <TouchableOpacity
+            style={styles.tabItem}
+            activeOpacity={0.7}
+            onPress={() =>
+              router.replace(
+                '/GraficoScreen'
+              )
+            }
+          >
+            <Ionicons
+              name="stats-chart"
+              size={22}
+              color="#94A3B8"
+            />
+
+            <Text
+              style={
+                styles.tabLabelInactive
+              }
+            >
+              Gráficos
+            </Text>
+          </TouchableOpacity>
+
+          {/* CONFIGURAÇÃO */}
+          <TouchableOpacity
+            style={styles.tabItem}
+            activeOpacity={0.7}
+            onPress={() =>
+              router.replace(
+                '/ConfiguracaoScreen'
+              )
+            }
+          >
+            <Ionicons
+              name="settings-outline"
+              size={22}
+              color="#94A3B8"
+            />
+
+            <Text
+              style={
+                styles.tabLabelInactive
+              }
+            >
+              Configuração
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* =====================================================
+            MODAL
+        ===================================================== */}
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={fecharModal}
+        >
+          <KeyboardAvoidingView
+            style={styles.modalKeyboard}
+            behavior={
+              Platform.OS === 'ios'
+                ? 'padding'
+                : 'height'
+            }
+          >
+            <View
+              style={styles.modalOverlay}
+            >
+              <View
+                style={styles.modalContainer}
+              >
+                {/* CABEÇALHO DO MODAL */}
+                <View
+                  style={styles.modalHeader}
+                >
+                  <View
+                    style={[
+                      styles.modalIcon,
+                      {
+                        backgroundColor:
+                          tipoTransacao ===
+                          'receita'
+                            ? '#D1FAE5'
+                            : '#FEE2E2',
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        tipoTransacao ===
+                        'receita'
+                          ? 'arrow-up-outline'
+                          : 'arrow-down-outline'
+                      }
+                      size={23}
+                      color={
+                        tipoTransacao ===
+                        'receita'
+                          ? '#10B981'
+                          : '#EF4444'
+                      }
+                    />
+                  </View>
+
+                  <View
+                    style={
+                      styles.modalTitleContainer
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.modalTitle
+                      }
+                    >
+                      {tipoTransacao ===
+                      'receita'
+                        ? 'Nova Receita'
+                        : 'Nova Despesa'}
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.modalSubtitle
+                      }
+                    >
+                      {tipoTransacao ===
+                      'receita'
+                        ? 'Registre uma nova entrada'
+                        : 'Registre uma nova saída'}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={
+                      styles.closeButton
+                    }
+                    onPress={fecharModal}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={22}
+                      color="#64748B"
+                    />
                   </TouchableOpacity>
                 </View>
 
-                {/* Descrição apenas para Despesas */}
-                {tipoTransacao === 'DESPESA' && (
-                  <>
-                    <Text style={styles.inputLabel}>Descrição</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      placeholder="Ex: Supermercado, Conta de Luz..."
-                      placeholderTextColor="#94A3B8"
-                      value={descricao}
-                      onChangeText={setDescricao}
-                      returnKeyType="done"
-                    />
-                  </>
-                )}
-
-                {/* Valor para ambas as opções */}
-                <Text style={styles.inputLabel}>Valor (R$)</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="0,00"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="numeric"
-                  value={valor}
-                  onChangeText={setValor}
-                  returnKeyType="done"
-                />
-
-                {/* Categorias apenas para Despesas */}
-                {tipoTransacao === 'DESPESA' && (
-                  <>
-                   {/* O QUE ESTÁ HOJE NO SEU CÓDIGO (por volta da linha 318-335) */}
-{/* CÓDIGO ATUALIZADO */}
-<Text style={styles.inputLabel}>Categoria</Text>
-<View style={styles.categoryContainer}>
-  {categorias.map((cat) => {
-    const nomeCategoria = typeof cat === 'object' ? cat.nome : cat;
-    const keyCategoria = typeof cat === 'object' ? cat.id : cat;
-
-    return (
-      <TouchableOpacity
-        key={keyCategoria}
-        style={[
-          styles.categoryChip, // Mantenha a mesma classe de estilo do seu projeto original
-          categoria === nomeCategoria && styles.categoryChipActive,
-        ]}
-        onPress={() => setCategoria(nomeCategoria)}
-      >
-        <Text style={categoria === nomeCategoria ? styles.categoryTextActive : styles.categoryText}>
-          {nomeCategoria}
-        </Text>
-      </TouchableOpacity>
-    );
-  })}
-</View>
-                  </>
-                )}
-
-                {/* Botão de Salvar */}
-                <TouchableOpacity 
-                  style={[
-                    styles.saveButton, 
-                    { backgroundColor: tipoTransacao === 'RECEITA' ? '#10B981' : '#EF4444' }
-                  ]} 
-                  onPress={handleSalvarTransacao}
+                <ScrollView
+                  showsVerticalScrollIndicator={
+                    false
+                  }
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={
+                    styles.modalScrollContent
+                  }
                 >
-                  <Text style={styles.saveButtonText}>
-                    Salvar {tipoTransacao === 'RECEITA' ? 'Receita' : 'Despesa'}
-                  </Text>
-                </TouchableOpacity>
+                  {/* VALOR */}
+                  <View
+                    style={styles.inputGroup}
+                  >
+                    <Text
+                      style={styles.inputLabel}
+                    >
+                      Valor
+                    </Text>
+
+                    <View
+                      style={
+                        styles.inputContainer
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.currencySymbol
+                        }
+                      >
+                        R$
+                      </Text>
+
+                      <TextInput
+                        style={
+                          styles.modalInput
+                        }
+                        placeholder="0,00"
+                        placeholderTextColor="#94A3B8"
+                        value={valor}
+                        onChangeText={setValor}
+                        keyboardType="decimal-pad"
+                        returnKeyType="next"
+                      />
+                    </View>
+                  </View>
+
+                  {/* DESCRIÇÃO */}
+                  <View
+                    style={styles.inputGroup}
+                  >
+                    <Text
+                      style={styles.inputLabel}
+                    >
+                      Descrição
+                    </Text>
+
+                    <View
+                      style={
+                        styles.inputContainer
+                      }
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={19}
+                        color="#64748B"
+                      />
+
+                      <TextInput
+                        style={
+                          styles.modalInput
+                        }
+                        placeholder={
+                          tipoTransacao ===
+                          'receita'
+                            ? 'Ex: Salário'
+                            : 'Ex: Mercado'
+                        }
+                        placeholderTextColor="#94A3B8"
+                        value={descricao}
+                        onChangeText={
+                          setDescricao
+                        }
+                        autoCapitalize="sentences"
+                        returnKeyType="done"
+                      />
+                    </View>
+                  </View>
+
+                  {/* CATEGORIAS */}
+                  {tipoTransacao ===
+                    'despesa' && (
+                    <View
+                      style={
+                        styles.inputGroup
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.inputLabel
+                        }
+                      >
+                        Categoria
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.categoryHint
+                        }
+                      >
+                        Selecione uma categoria
+                        para organizar sua
+                        despesa.
+                      </Text>
+
+                      <View
+                        style={
+                          styles.categoriesContainer
+                        }
+                      >
+                        {categorias &&
+                        categorias.length > 0 ? (
+                          categorias.map(
+                            (categoria) => {
+                              const selecionada =
+                                categoriaSelecionada
+                                  ?.id ===
+                                categoria.id;
+
+                              return (
+                                <TouchableOpacity
+                                  key={
+                                    categoria.id
+                                  }
+                                  activeOpacity={
+                                    0.8
+                                  }
+                                  onPress={() =>
+                                    setCategoriaSelecionada(
+                                      categoria
+                                    )
+                                  }
+                                  style={[
+                                    styles.categoryOption,
+                                    selecionada &&
+                                      styles.categoryOptionSelected,
+                                  ]}
+                                >
+                                  <View
+                                    style={[
+                                      styles.categoryOptionIcon,
+                                      selecionada &&
+                                        styles.categoryOptionIconSelected,
+                                    ]}
+                                  >
+                                    <Ionicons
+                                      name={
+                                        categoria.icone ||
+                                        'pricetag-outline'
+                                      }
+                                      size={18}
+                                      color={
+                                        selecionada
+                                          ? '#FFFFFF'
+                                          : '#162D50'
+                                      }
+                                    />
+                                  </View>
+
+                                  <Text
+                                    style={[
+                                      styles.categoryOptionText,
+                                      selecionada &&
+                                        styles.categoryOptionTextSelected,
+                                    ]}
+                                    numberOfLines={
+                                      1
+                                    }
+                                  >
+                                    {
+                                      categoria.nome
+                                    }
+                                  </Text>
+
+                                  {selecionada && (
+                                    <Ionicons
+                                      name="checkmark-circle"
+                                      size={19}
+                                      color="#10B981"
+                                    />
+                                  )}
+                                </TouchableOpacity>
+                              );
+                            }
+                          )
+                        ) : (
+                          <View
+                            style={
+                              styles.noCategories
+                            }
+                          >
+                            <Ionicons
+                              name="pricetag-outline"
+                              size={20}
+                              color="#94A3B8"
+                            />
+
+                            <Text
+                              style={
+                                styles.noCategoriesText
+                              }
+                            >
+                              Nenhuma categoria
+                              cadastrada.
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* SALVAR */}
+                  <TouchableOpacity
+                    style={[
+                      styles.saveButton,
+                      {
+                        backgroundColor:
+                          tipoTransacao ===
+                          'receita'
+                            ? '#10B981'
+                            : '#162D50',
+                      },
+                    ]}
+                    activeOpacity={0.85}
+                    onPress={
+                      handleSalvarTransacao
+                    }
+                  >
+                    <Ionicons
+                      name="checkmark-circle-outline"
+                      size={20}
+                      color="#FFFFFF"
+                    />
+
+                    <Text
+                      style={
+                        styles.saveButtonText
+                      }
+                    >
+                      Salvar{' '}
+                      {tipoTransacao ===
+                      'receita'
+                        ? 'Receita'
+                        : 'Despesa'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* CANCELAR */}
+                  <TouchableOpacity
+                    style={
+                      styles.cancelButton
+                    }
+                    onPress={fecharModal}
+                  >
+                    <Text
+                      style={
+                        styles.cancelButtonText
+                      }
+                    >
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
               </View>
-            </KeyboardAvoidingView>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* TAB BAR INFERIOR */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={styles.tabItem} activeOpacity={0.7}>
-          <Ionicons name="home" size={22} color="#10B981" />
-          <Text style={styles.tabLabelActive}>Início</Text>
-          <View style={styles.activeIndicator} />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          activeOpacity={0.7}
-          onPress={() => router.push({
-            pathname: '/GraficoScreen',
-            params: { nome: nomeUsuario }
-          })}
-        >
-          <Ionicons name="stats-chart-outline" size={22} color="#94A3B8" />
-          <Text style={styles.tabLabelInactive}>Gráfico</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          activeOpacity={0.7}
-          onPress={() => router.push('/ConfiguracaoScreen')}
-        >
-          <Ionicons name="settings-outline" size={22} color="#94A3B8" />
-          <Text style={styles.tabLabelInactive}>Ajustes</Text>
-        </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  /* ============================================================
+     TELA
+  ============================================================ */
+
   safeArea: {
     flex: 1,
-    backgroundColor: '#162D50',
+    backgroundColor: '#FFFFFF',
   },
+
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+
+  /* ============================================================
+     HEADER
+  ============================================================ */
+
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 16,
-  },
-  greetingText: {
-    fontSize: 13,
-    color: '#94A3B8',
-  },
-  userNameText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  logoutButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#1E3A8A',
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  container: {
-    paddingHorizontal: 24,
-    paddingBottom: 90,
-  },
-  whiteCard: {
+    paddingBottom: 18,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    width: '100%',
-    marginTop: 8,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
   },
-  mainCardLabel: {
+
+  welcomeText: {
     fontSize: 13,
     color: '#64748B',
     fontWeight: '500',
   },
-  mainCardBalance: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginTop: 4,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 16,
-  },
-  summaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  arrowIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  summaryIncome: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#10B981',
-  },
-  summaryOutcome: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#EF4444',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#F8FAFC',
-    marginBottom: 12,
-  },
-  quickActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 28,
-  },
-  whiteActionButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    width: '48%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  actionIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  whiteCardTransactions: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#94A3B8',
-    paddingVertical: 20,
-  },
-  transactionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  rowDivider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  transactionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  transactionIconBg: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  transactionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  transactionSub: {
-    fontSize: 11,
-    color: '#94A3B8',
+
+  userName: {
+    fontSize: 23,
+    fontWeight: '800',
+    color: '#162D50',
     marginTop: 2,
   },
-  transactionRight: {
-    flexDirection: 'row',
+
+  headerIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
+    backgroundColor: '#E8EEF5',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
   },
-  transactionAmount: {
-    fontSize: 14,
-    fontWeight: 'bold',
+
+  /* ============================================================
+     SCROLL
+  ============================================================ */
+
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 105,
   },
-  deleteButton: {
-    padding: 4,
+
+  /* ============================================================
+     TÍTULOS
+  ============================================================ */
+
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#162D50',
+    marginBottom: 12,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+
+  /* ============================================================
+     CARD DO SALDO
+  ============================================================ */
+
+  balanceCard: {
+    backgroundColor: '#162D50',
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 25,
+    shadowColor: '#162D50',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  modalContentWrapper: {
-    width: '100%',
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-  },
-  modalHeader: {
+
+  balanceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
+
+  balanceLabel: {
+    fontSize: 10,
+    color: '#CBD5E1',
+    fontWeight: '700',
+    letterSpacing: 0.7,
   },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#64748B',
-    marginBottom: 6,
-    marginTop: 10,
+
+  balanceTitle: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginTop: 4,
   },
-  modalInput: {
-    backgroundColor: '#F8FAFC',
+
+  balanceIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#233D62',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  mainCardBalance: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginTop: 20,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#334A6B',
+    marginVertical: 17,
+  },
+
+  balanceSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  summaryItem: {
+    flex: 1,
+  },
+
+  summaryLabel: {
+    fontSize: 9,
+    color: '#94A3B8',
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+
+  summaryValueGreen: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#10B981',
+    marginTop: 4,
+  },
+
+  summaryValueRed: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#EF4444',
+    marginTop: 4,
+  },
+
+  /* ============================================================
+     AÇÕES
+  ============================================================ */
+
+  actionsRow: {
+    gap: 10,
+    marginBottom: 25,
+  },
+
+  actionCard: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#1E293B',
-  },
-  categoryContainer: {
+    borderRadius: 16,
+    minHeight: 70,
+    paddingHorizontal: 13,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
+    alignItems: 'center',
+    shadowColor: '#162D50',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  categoryChip: {
+
+  actionIconGreen: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  actionIconRed: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  actionTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  actionText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#162D50',
+  },
+
+  actionSubtext: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 3,
+  },
+
+  /* ============================================================
+     TRANSAÇÕES
+  ============================================================ */
+
+  transactionsCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 20,
+  },
+
+  transactionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+
+  transactionCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#162D50',
+  },
+
+  seeMore: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#10B981',
+  },
+
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 30,
+  },
+
+  emptyIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 17,
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  categoryChipSelected: {
-    backgroundColor: '#3B82F6',
+
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#162D50',
   },
-  categoryText: {
-    fontSize: 12,
-    color: '#64748B',
+
+  emptyText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 5,
   },
-  categoryTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+
+  transactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
   },
-  saveButton: {
-    paddingVertical: 14,
+
+  transactionBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+
+  transactionIcon: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 24,
+    justifyContent: 'center',
   },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+
+  transactionInfo: {
+    flex: 1,
+    marginLeft: 11,
+    minWidth: 0,
   },
+
+  transactionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#162D50',
+  },
+
+  transactionSub: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 3,
+  },
+
+  transactionRight: {
+    alignItems: 'flex-end',
+    marginLeft: 10,
+  },
+
+  transactionValue: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  deleteButton: {
+    marginTop: 4,
+    padding: 2,
+  },
+
+  /* ============================================================
+     BARRA INFERIOR
+     EXATAMENTE NO PADRÃO DO GRÁFICOS
+  ============================================================ */
+
   tabBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 70,
-    backgroundColor: '#0F172A',
+    height: 72,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
-    paddingBottom: 10,
-    paddingTop: 8,
+    borderTopColor: '#E2E8F0',
+    paddingBottom: 5,
+    paddingTop: 5,
+    shadowColor: '#162D50',
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 8,
   },
+
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    height: '100%',
   },
+
+  activeIconContainer: {
+    width: 38,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#E8EEF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   tabLabelInactive: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#94A3B8',
+    fontWeight: '600',
     marginTop: 4,
   },
+
   tabLabelActive: {
-    fontSize: 11,
-    color: '#10B981',
-    fontWeight: 'bold',
+    fontSize: 10,
+    color: '#162D50',
+    fontWeight: '800',
     marginTop: 4,
   },
+
   activeIndicator: {
     position: 'absolute',
-    top: -8,
-    width: 20,
+    bottom: 0,
+    width: 25,
     height: 3,
     backgroundColor: '#10B981',
-    borderRadius: 2,
+    borderRadius: 3,
+  },
+
+  /* ============================================================
+     MODAL
+  ============================================================ */
+
+  modalKeyboard: {
+    flex: 1,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'flex-end',
+  },
+
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    maxHeight: '90%',
+    paddingTop: 18,
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+  },
+
+  modalIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  modalTitleContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#162D50',
+  },
+
+  modalSubtitle: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 3,
+  },
+
+  closeButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  modalScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+  },
+
+  inputGroup: {
+    marginBottom: 18,
+  },
+
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#162D50',
+    marginBottom: 7,
+  },
+
+  inputContainer: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    backgroundColor: '#F8FAFC',
+  },
+
+  currencySymbol: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#162D50',
+    marginRight: 8,
+  },
+
+  modalInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#162D50',
+    paddingVertical: 12,
+  },
+
+  categoryHint: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginBottom: 9,
+  },
+
+  categoriesContainer: {
+    gap: 8,
+  },
+
+  categoryOption: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
+  },
+
+  categoryOptionSelected: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+
+  categoryOptionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#E8EEF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  categoryOptionIconSelected: {
+    backgroundColor: '#10B981',
+  },
+
+  categoryOptionText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#162D50',
+    marginLeft: 10,
+  },
+
+  categoryOptionTextSelected: {
+    color: '#162D50',
+    fontWeight: '800',
+  },
+
+  noCategories: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+  },
+
+  noCategoriesText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginLeft: 7,
+  },
+
+  saveButton: {
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginTop: 5,
+  },
+
+  saveButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginLeft: 7,
+  },
+
+  cancelButton: {
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+
+  cancelButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
   },
 });

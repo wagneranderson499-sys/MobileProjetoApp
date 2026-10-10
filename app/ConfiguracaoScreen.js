@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from 'react';
+
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Switch,
   Alert,
@@ -16,12 +16,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
-  Keyboard
+  Keyboard,
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCategorias } from '../context/CategoryContext';
+import api from '../Services/api';
 
 export default function ConfiguracaoScreen() {
   const [notificacoes, setNotificacoes] = useState(true);
@@ -29,31 +32,38 @@ export default function ConfiguracaoScreen() {
   // Dados do Usuário Logado
   const [usuario, setUsuario] = useState(null);
 
-  // Modais de Edição de Perfil e Alteração de Senha
+  // Modal de Edição de Perfil
   const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
   const [nomeEdit, setNomeEdit] = useState('');
   const [emailEdit, setEmailEdit] = useState('');
 
+  // Modal de Alteração de Senha
   const [modalSenhaVisible, setModalSenhaVisible] = useState(false);
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
 
   // Contexto Global de Categorias
-  const { categorias, adicionarCategoria, removerCategoria } = useCategorias();
-  
+  const {
+    categorias,
+    adicionarCategoria,
+    removerCategoria,
+  } = useCategorias();
+
   // Modal de Categorias
   const [modalCategoryVisible, setModalCategoryVisible] = useState(false);
   const [novaCategoria, setNovaCategoria] = useState('');
 
-  // Recarrega os dados do usuário sempre que a tela de Ajustes entrar em foco
+  // Recarrega os dados do usuário sempre que a tela entrar em foco
   useFocusEffect(
     useCallback(() => {
       async function carregarUsuario() {
         try {
           const userJson = await AsyncStorage.getItem('@usuario_logado');
+
           if (userJson) {
             const user = JSON.parse(userJson);
+
             setUsuario(user);
             setNomeEdit(user.nome || '');
             setEmailEdit(user.email || '');
@@ -62,369 +72,1007 @@ export default function ConfiguracaoScreen() {
           console.error('Erro ao carregar usuário:', error);
         }
       }
+
       carregarUsuario();
     }, [])
   );
 
-  // Salvar alterações de Nome e E-mail do Usuário
+  // Salvar alteração do nome
   const handleSalvarPerfil = async () => {
-    if (!nomeEdit.trim() || !emailEdit.trim()) {
-      Alert.alert('Erro', 'Por favor, preencha nome e e-mail.');
+    if (!nomeEdit.trim()) {
+      Alert.alert('Erro', 'Digite um nome.');
+      return;
+    }
+
+    if (!usuario?.id) {
+      Alert.alert(
+        'Erro',
+        'Não foi possível identificar o usuário.'
+      );
       return;
     }
 
     try {
-      const usuarioAtualizado = { ...usuario, nome: nomeEdit, email: emailEdit };
-      await AsyncStorage.setItem('@usuario_logado', JSON.stringify(usuarioAtualizado));
+      const response = await api.put(
+        `/${usuario.id}/nome`,
+        {
+          nome: nomeEdit.trim(),
+        }
+      );
+
+      const usuarioAtualizado = {
+        ...usuario,
+        nome: response.data.nome || nomeEdit.trim(),
+      };
+
+      await AsyncStorage.setItem(
+        '@usuario_logado',
+        JSON.stringify(usuarioAtualizado)
+      );
+
       setUsuario(usuarioAtualizado);
+      setNomeEdit(usuarioAtualizado.nome);
       setModalPerfilVisible(false);
-      Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
+
+      Alert.alert(
+        'Sucesso',
+        'Nome atualizado com sucesso!'
+      );
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível salvar as alterações.');
+      console.error(
+        'Erro ao atualizar nome:',
+        error
+      );
+
+      Alert.alert(
+        'Erro',
+        error.response?.data?.message ||
+          'Não foi possível atualizar o nome.'
+      );
     }
   };
 
-  // Alterar Senha com Validação
+  // Alterar senha
   const handleAlterarSenha = async () => {
-    if (!senhaAtual || !novaSenha || !confirmarSenha) {
-      Alert.alert('Atenção', 'Preencha todos os campos da senha.');
+    if (
+      !senhaAtual ||
+      !novaSenha ||
+      !confirmarSenha
+    ) {
+      Alert.alert(
+        'Atenção',
+        'Preencha todos os campos da senha.'
+      );
       return;
     }
 
     if (novaSenha !== confirmarSenha) {
-      Alert.alert('Erro', 'A nova senha e a confirmação não coincidem.');
+      Alert.alert(
+        'Erro',
+        'A nova senha e a confirmação não coincidem.'
+      );
       return;
     }
 
-    if (usuario?.senha && senhaAtual !== usuario.senha) {
-      Alert.alert('Erro', 'A senha atual está incorreta.');
+    if (!usuario?.email) {
+      Alert.alert(
+        'Erro',
+        'Não foi possível identificar o e-mail do usuário.'
+      );
       return;
     }
 
     try {
-      const usuarioAtualizado = { ...usuario, senha: novaSenha };
-      await AsyncStorage.setItem('@usuario_logado', JSON.stringify(usuarioAtualizado));
-      setUsuario(usuarioAtualizado);
+      const response = await api.put(
+        '/alterar-senha',
+        {
+          email: usuario.email,
+          senhaAtual: senhaAtual,
+          novaSenha: novaSenha,
+        }
+      );
+
       setSenhaAtual('');
       setNovaSenha('');
       setConfirmarSenha('');
       setModalSenhaVisible(false);
-      Alert.alert('Sucesso', 'Senha alterada com sucesso!');
+
+      Alert.alert(
+        'Sucesso',
+        response.data?.message ||
+          'Senha alterada com sucesso!'
+      );
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível alterar a senha.');
+      console.error(
+        'Erro ao alterar senha:',
+        error
+      );
+
+      Alert.alert(
+        'Erro',
+        error.response?.data?.message ||
+          'Não foi possível alterar a senha.'
+      );
     }
   };
 
-  // Gerenciamento de Categorias
+  // Adicionar Categoria
   const handleAdicionar = () => {
     if (!novaCategoria.trim()) {
-      Alert.alert('Atenção', 'Digite o nome da categoria.');
+      Alert.alert(
+        'Atenção',
+        'Digite o nome da categoria.'
+      );
       return;
     }
+
     adicionarCategoria(novaCategoria);
     setNovaCategoria('');
     Keyboard.dismiss();
   };
 
+  // Remover Categoria
   const handleRemover = (id, nome) => {
     Alert.alert(
       'Excluir Categoria',
       `Deseja remover a categoria "${nome}"?`,
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: () => removerCategoria(id) }
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => removerCategoria(id),
+        },
       ]
     );
   };
 
   // Sair do Aplicativo
   const handleSair = () => {
-    Alert.alert('Sair da Conta', 'Tem certeza que deseja encerrar a sessão?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { 
-        text: 'Sair', 
-        style: 'destructive', 
-        onPress: async () => {
-          await AsyncStorage.removeItem('@usuario_logado');
-          router.replace('/LoginScreen');
-        } 
-      },
-    ]);
+    Alert.alert(
+      'Sair da Conta',
+      'Tem certeza que deseja encerrar a sessão?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.removeItem(
+              '@usuario_logado'
+            );
+
+            router.replace('/LoginScreen');
+          },
+        },
+      ]
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#162D50" />
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'left', 'right']}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#F8FAFC"
+      />
 
       {/* CABEÇALHO */}
       <View style={styles.headerArea}>
-        <Text style={styles.headerTitle}>Configurações</Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.headerIcon}>
+            <Ionicons
+              name="settings-outline"
+              size={21}
+              color="#162D50"
+            />
+          </View>
+
+          <View>
+            <Text style={styles.headerTitle}>
+              Configurações
+            </Text>
+
+            <Text style={styles.headerSub}>
+              Gerencie sua conta e preferências
+            </Text>
+          </View>
+        </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
-        {/* CARD PERFIL DINÂMICO */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* CARD PERFIL */}
         <View style={styles.profileCard}>
           <Image
-            source={{ uri: `https://avatar.iran.liara.run/public/username?username=${usuario?.nome || 'User'}` }}
+            source={{
+              uri: `https://avatar.iran.liara.run/public/username?username=${
+                usuario?.nome || 'User'
+              }`,
+            }}
             style={styles.avatar}
           />
+
           <View style={styles.profileInfo}>
-            <Text style={styles.userName}>{usuario?.nome || 'Usuário Logado'}</Text>
-            <Text style={styles.userEmail}>{usuario?.email || 'email@exemplo.com'}</Text>
+            <Text style={styles.userName}>
+              {usuario?.nome || 'Usuário Logado'}
+            </Text>
+
+            <Text style={styles.userEmail}>
+              {usuario?.email || 'email@exemplo.com'}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.editButton} onPress={() => setModalPerfilVisible(true)}>
-            <Ionicons name="pencil" size={18} color="#162D50" />
+
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() =>
+              setModalPerfilVisible(true)
+            }
+          >
+            <Ionicons
+              name="pencil-outline"
+              size={18}
+              color="#162D50"
+            />
           </TouchableOpacity>
         </View>
 
-        {/* SEÇÃO 1: GERENCIAMENTO */}
-        <Text style={styles.sectionTitle}>Gerenciamento</Text>
+        {/* GERENCIAMENTO */}
+        <Text style={styles.sectionTitle}>
+          Gerenciamento
+        </Text>
+
         <View style={styles.optionsCard}>
-          <TouchableOpacity style={styles.optionRow} onPress={() => setModalCategoryVisible(true)}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() =>
+              setModalCategoryVisible(true)
+            }
+          >
             <View style={styles.optionLeft}>
-              <Ionicons name="pricetags-outline" size={22} color="#162D50" />
-              <Text style={styles.optionText}>Gerenciar Categorias</Text>
+              <View style={styles.optionIcon}>
+                <Ionicons
+                  name="pricetags-outline"
+                  size={20}
+                  color="#162D50"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.optionText}>
+                  Gerenciar Categorias
+                </Text>
+
+                <Text style={styles.optionSubtext}>
+                  Organize suas despesas
+                </Text>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color="#94A3B8"
+            />
           </TouchableOpacity>
 
           <View style={styles.divider} />
 
-          <TouchableOpacity style={styles.optionRow} onPress={() => setModalSenhaVisible(true)}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() =>
+              setModalSenhaVisible(true)
+            }
+          >
             <View style={styles.optionLeft}>
-              <Ionicons name="key-outline" size={22} color="#162D50" />
-              <Text style={styles.optionText}>Redefinir Senha</Text>
+              <View style={styles.optionIcon}>
+                <Ionicons
+                  name="key-outline"
+                  size={20}
+                  color="#162D50"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.optionText}>
+                  Redefinir Senha
+                </Text>
+
+                <Text style={styles.optionSubtext}>
+                  Altere sua senha de acesso
+                </Text>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color="#94A3B8"
+            />
           </TouchableOpacity>
         </View>
 
-        {/* SEÇÃO 2: PREFERÊNCIAS */}
-        <Text style={styles.sectionTitle}>Preferências</Text>
+        {/* PREFERÊNCIAS */}
+        <Text style={styles.sectionTitle}>
+          Preferências
+        </Text>
+
         <View style={styles.optionsCard}>
           <View style={styles.optionRow}>
             <View style={styles.optionLeft}>
-              <Ionicons name="notifications-outline" size={22} color="#162D50" />
-              <Text style={styles.optionText}>Notificações</Text>
+              <View style={styles.optionIcon}>
+                <Ionicons
+                  name="notifications-outline"
+                  size={20}
+                  color="#162D50"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.optionText}>
+                  Notificações
+                </Text>
+
+                <Text style={styles.optionSubtext}>
+                  Receba avisos do aplicativo
+                </Text>
+              </View>
             </View>
+
             <Switch
               value={notificacoes}
               onValueChange={setNotificacoes}
-              trackColor={{ false: '#CBD5E1', true: '#10B981' }}
+              trackColor={{
+                false: '#CBD5E1',
+                true: '#10B981',
+              }}
               thumbColor="#FFFFFF"
             />
           </View>
         </View>
 
-        {/* SAIR DO APP */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleSair}>
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-          <Text style={styles.logoutText}>Sair do Aplicativo</Text>
-        </TouchableOpacity>
+        {/* SAIR */}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleSair}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="log-out-outline"
+            size={20}
+            color="#EF4444"
+          />
 
+          <Text style={styles.logoutText}>
+            Sair do Aplicativo
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
-      {/* MODAL: CATEGORIAS (TRATADO CONTRA O TECLADO) */}
-      <Modal visible={modalCategoryVisible} animationType="slide" transparent={true}>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={{ width: '100%' }}
-            >
+      {/* MODAL: EDITAR PERFIL */}
+      <Modal
+        visible={modalPerfilVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <KeyboardAvoidingView
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : 'height'
+          }
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback
+            onPress={Keyboard.dismiss}
+          >
+            <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Categorias Personalizadas</Text>
-                  <TouchableOpacity onPress={() => setModalCategoryVisible(false)}>
-                    <Ionicons name="close" size={24} color="#0F172A" />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Nova categoria..."
-                    placeholderTextColor="#94A3B8"
-                    value={novaCategoria}
-                    onChangeText={setNovaCategoria}
-                  />
-                  <TouchableOpacity style={styles.addButton} onPress={handleAdicionar}>
-                    <Ionicons name="add" size={22} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-
-                <FlatList
-                  data={categorias}
-                  keyExtractor={(item) => item.id.toString()}
-                  extraData={categorias} // Garante a re-renderização imediata ao mudar o array
-                  keyboardShouldPersistTaps="handled"
-                  renderItem={({ item }) => (
-                    <View style={styles.categoryItem}>
-                      <View style={styles.categoryItemLeft}>
-                        <Ionicons name={item.icone || 'pricetag-outline'} size={20} color="#162D50" />
-                        <Text style={styles.categoryName}>{item.nome}</Text>
-                      </View>
-                      <TouchableOpacity onPress={() => handleRemover(item.id, item.nome)}>
-                        <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                      </TouchableOpacity>
+                  <View style={styles.modalTitleArea}>
+                    <View style={styles.modalIcon}>
+                      <Ionicons
+                        name="person-outline"
+                        size={21}
+                        color="#162D50"
+                      />
                     </View>
-                  )}
-                  ItemSeparatorComponent={() => <View style={styles.divider} />}
-                  style={{ maxHeight: 250 }}
+
+                    <View>
+                      <Text style={styles.modalTitle}>
+                        Editar Perfil
+                      </Text>
+
+                      <Text style={styles.modalSubtitle}>
+                        Atualize seus dados
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      setModalPerfilVisible(false)
+                    }
+                    style={styles.modalCloseButton}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={22}
+                      color="#64748B"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.fieldLabel}>
+                  Nome
+                </Text>
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Digite seu nome"
+                  placeholderTextColor="#94A3B8"
+                  value={nomeEdit}
+                  onChangeText={setNomeEdit}
+                  autoCapitalize="words"
                 />
+
+                <Text style={styles.fieldLabelEmail}>
+                  E-mail
+                </Text>
+
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.disabledInput,
+                  ]}
+                  value={usuario?.email || ''}
+                  editable={false}
+                />
+
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSalvarPerfil}
+                >
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={19}
+                    color="#FFFFFF"
+                  />
+
+                  <Text style={styles.saveButtonText}>
+                    Salvar alterações
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </KeyboardAvoidingView>
-          </View>
-        </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* TAB BAR PADRONIZADA */}
-      {/* TAB BAR PADRONIZADA */}
-<View style={styles.tabBar}>
-  <TouchableOpacity 
-    style={styles.tabItem} 
-    activeOpacity={0.7}
-    onPress={() => router.push('/DashboardScreen')}
-  >
-    <Ionicons name="home-outline" size={22} color="#94A3B8" />
-    <Text style={styles.tabLabelInactive}>Início</Text>
-  </TouchableOpacity>
+      {/* MODAL: CATEGORIAS */}
+      <Modal
+        visible={modalCategoryVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={
+              Platform.OS === 'ios'
+                ? 'padding'
+                : undefined
+            }
+            style={styles.categoryKeyboardView}
+          >
+            <View style={styles.categoryModalContent}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleArea}>
+                  <View style={styles.modalIcon}>
+                    <Ionicons
+                      name="pricetags-outline"
+                      size={21}
+                      color="#162D50"
+                    />
+                  </View>
 
-  <TouchableOpacity 
-    style={styles.tabItem} 
-    activeOpacity={0.7}
-    onPress={() => router.push('/GraficoScreen')}
-  >
-    <Ionicons name="stats-chart-outline" size={22} color="#94A3B8" />
-    <Text style={styles.tabLabelInactive}>Gráficos</Text>
-  </TouchableOpacity>
+                  <View>
+                    <Text style={styles.modalTitle}>
+                      Categorias
+                    </Text>
 
-  <TouchableOpacity 
-    style={styles.tabItem} 
-    activeOpacity={0.7}
-    onPress={() => router.push('/ConfiguracaoScreen')}
-  >
-    <Ionicons name="settings" size={22} color="#10B981" />
-    <Text style={styles.tabLabelActive}>Ajustes</Text>
-    <View style={styles.activeIndicator} />
-  </TouchableOpacity>
-</View>
+                    <Text style={styles.modalSubtitle}>
+                      Personalize suas categorias
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    setModalCategoryVisible(false)
+                  }
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons
+                    name="close"
+                    size={22}
+                    color="#64748B"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nova categoria..."
+                  placeholderTextColor="#94A3B8"
+                  value={novaCategoria}
+                  onChangeText={setNovaCategoria}
+                />
+
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={handleAdicionar}
+                >
+                  <Ionicons
+                    name="add"
+                    size={22}
+                    color="#FFFFFF"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* LISTA ROLÁVEL */}
+              <FlatList
+                data={categorias}
+                keyExtractor={(item) =>
+                  item.id.toString()
+                }
+                extraData={categorias}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+                style={styles.categoryList}
+                contentContainerStyle={
+                  styles.categoryListContent
+                }
+                renderItem={({ item }) => (
+                  <View style={styles.categoryItem}>
+                    <View
+                      style={styles.categoryItemLeft}
+                    >
+                      <View
+                        style={
+                          styles.categoryItemIcon
+                        }
+                      >
+                        <Ionicons
+                          name={
+                            item.icone ||
+                            'pricetag-outline'
+                          }
+                          size={18}
+                          color="#162D50"
+                        />
+                      </View>
+
+                      <Text
+                        style={styles.categoryName}
+                      >
+                        {item.nome}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={() =>
+                        handleRemover(
+                          item.id,
+                          item.nome
+                        )
+                      }
+                      style={styles.categoryDelete}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={19}
+                        color="#EF4444"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                ItemSeparatorComponent={() => (
+                  <View style={styles.divider} />
+                )}
+              />
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* MODAL: ALTERAR SENHA */}
+      <Modal
+        visible={modalSenhaVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <KeyboardAvoidingView
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : 'height'
+          }
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback
+            onPress={Keyboard.dismiss}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalTitleArea}>
+                    <View style={styles.modalIcon}>
+                      <Ionicons
+                        name="key-outline"
+                        size={21}
+                        color="#162D50"
+                      />
+                    </View>
+
+                    <View>
+                      <Text style={styles.modalTitle}>
+                        Redefinir Senha
+                      </Text>
+
+                      <Text style={styles.modalSubtitle}>
+                        Altere sua senha de acesso
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      setModalSenhaVisible(false)
+                    }
+                    style={styles.modalCloseButton}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={22}
+                      color="#64748B"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.fieldLabel}>
+                  Senha atual
+                </Text>
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Digite sua senha atual"
+                  placeholderTextColor="#94A3B8"
+                  value={senhaAtual}
+                  onChangeText={setSenhaAtual}
+                  secureTextEntry
+                />
+
+                <Text style={styles.fieldLabelEmail}>
+                  Nova senha
+                </Text>
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Digite a nova senha"
+                  placeholderTextColor="#94A3B8"
+                  value={novaSenha}
+                  onChangeText={setNovaSenha}
+                  secureTextEntry
+                />
+
+                <Text style={styles.fieldLabelEmail}>
+                  Confirmar nova senha
+                </Text>
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Digite novamente a nova senha"
+                  placeholderTextColor="#94A3B8"
+                  value={confirmarSenha}
+                  onChangeText={setConfirmarSenha}
+                  secureTextEntry
+                />
+
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleAlterarSenha}
+                >
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={19}
+                    color="#FFFFFF"
+                  />
+
+                  <Text style={styles.saveButtonText}>
+                    Alterar senha
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* TAB BAR */}
+      <View style={styles.tabBar}>
+        {/* INÍCIO */}
+        <TouchableOpacity
+          style={styles.tabItem}
+          activeOpacity={0.7}
+          onPress={() =>
+            router.replace('/DashboardScreen')
+          }
+        >
+          <Ionicons
+            name="home-outline"
+            size={22}
+            color="#94A3B8"
+          />
+
+          <Text style={styles.tabLabelInactive}>
+            Início
+          </Text>
+        </TouchableOpacity>
+
+        {/* GRÁFICOS */}
+        <TouchableOpacity
+          style={styles.tabItem}
+          activeOpacity={0.7}
+          onPress={() =>
+            router.replace('/GraficoScreen')
+          }
+        >
+          <Ionicons
+            name="stats-chart"
+            size={21}
+            color="#94A3B8"
+          />
+
+          <Text style={styles.tabLabelInactive}>
+            Gráficos
+          </Text>
+        </TouchableOpacity>
+
+        {/* CONFIGURAÇÃO - ATIVO */}
+        <TouchableOpacity
+          style={styles.tabItem}
+          activeOpacity={0.7}
+          onPress={() =>
+            router.replace('/ConfiguracaoScreen')
+          }
+        >
+          <View style={styles.activeIconContainer}>
+            <Ionicons
+              name="settings"
+              size={21}
+              color="#162D50"
+            />
+          </View>
+
+          <Text style={styles.tabLabelActive}>
+            Configuração
+          </Text>
+
+          <View style={styles.activeIndicator} />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  // TELA
   container: {
     flex: 1,
-    backgroundColor: '#162D50',
+    backgroundColor: '#F8FAFC',
   },
+
+  // CABEÇALHO
   headerArea: {
-    backgroundColor: '#162D50',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 20,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+
+  headerLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
+
+  headerIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
+    backgroundColor: '#E8EEF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
   headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 21,
+    fontWeight: '800',
+    color: '#162D50',
   },
+
+  headerSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 3,
+  },
+
+  // SCROLL
   scrollContent: {
-    padding: 20,
-    paddingBottom: 100,
+    paddingHorizontal: 20,
+    paddingBottom: 105,
   },
+
+  // PERFIL
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#162D50',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
+
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
   },
+
   profileInfo: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: 13,
   },
+
   userName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0F172A',
+    fontWeight: '800',
+    color: '#162D50',
   },
+
   userEmail: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 4,
   },
+
   editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#E8EEF5',
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  // SEÇÕES
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#162D50',
     marginBottom: 10,
-    marginLeft: 4,
+    marginLeft: 2,
   },
+
+  // CARDS DE OPÇÕES
   optionsCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 18,
     paddingHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#162D50',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
+
   optionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 15,
   },
+
   optionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flex: 1,
   },
+
+  optionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#E8EEF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
+  },
+
   optionText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#162D50',
   },
+
+  optionSubtext: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 3,
+  },
+
   divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
   },
+
+  // LOGOUT
   logoutButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FECACA',
     borderRadius: 16,
     paddingVertical: 14,
-    marginTop: 10,
-  },
-  logoutText: {
-    color: '#EF4444',
-    fontSize: 15,
-    fontWeight: 'bold',
+    marginTop: 2,
+    marginBottom: 20,
   },
 
-  /* MODAIS */
+  logoutText: {
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  // MODAIS
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end',
   },
+
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
@@ -432,93 +1080,241 @@ const styles = StyleSheet.create({
     padding: 20,
     minHeight: 320,
   },
+
+  // MODAL DE CATEGORIAS
+  categoryKeyboardView: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+
+  categoryModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    height: '75%',
+    maxHeight: '85%',
+  },
+
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
+
+  modalTitleArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  modalIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#E8EEF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
+  },
+
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0F172A',
+    fontWeight: '800',
+    color: '#162D50',
   },
+
+  modalSubtitle: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 3,
+  },
+
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#162D50',
+    marginBottom: 7,
+  },
+
+  fieldLabelEmail: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#162D50',
+    marginTop: 15,
+    marginBottom: 7,
+  },
+
   inputContainer: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
   },
+
   input: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 12,
     paddingHorizontal: 14,
-    height: 46,
-    color: '#0F172A',
+    height: 48,
+    color: '#162D50',
+    fontSize: 13,
   },
+
+  disabledInput: {
+    backgroundColor: '#F1F5F9',
+    color: '#64748B',
+  },
+
+  saveButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 13,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 20,
+  },
+
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
   addButton: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     backgroundColor: '#10B981',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  // CATEGORIAS
+  categoryList: {
+    flex: 1,
+    minHeight: 0,
+  },
+
+  categoryListContent: {
+    paddingBottom: 20,
+  },
+
   categoryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
   },
+
   categoryItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  categoryName: {
-    fontSize: 15,
-    color: '#0F172A',
-    fontWeight: '500',
+    flex: 1,
   },
 
-  /* TAB BAR PADRONIZADA (AZUL ESCURO) */
+  categoryItemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#E8EEF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  categoryName: {
+    fontSize: 13,
+    color: '#162D50',
+    fontWeight: '700',
+  },
+
+  categoryDelete: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // TAB BAR
   tabBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 65,
-    backgroundColor: '#0F172A', // Cor alterada de #FFFFFF para o azul escuro
+    height: 72,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)', // Borda sutil para fundo escuro
-    paddingBottom: 8,
-    paddingTop: 6,
+    borderTopColor: '#E2E8F0',
+    paddingBottom: 5,
+    paddingTop: 5,
+    shadowColor: '#162D50',
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 100,
   },
+
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    height: '100%',
   },
+
+  activeIconContainer: {
+    width: 38,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#E8EEF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   tabLabelInactive: {
-    fontSize: 11,
-    color: '#94A3B8', // Cinza claro para itens inativos
-    marginTop: 3,
+    fontSize: 10,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 4,
   },
+
   tabLabelActive: {
-    fontSize: 11,
-    color: '#10B981', // Verde de destaque para a aba ativa
-    fontWeight: 'bold',
-    marginTop: 3,
+    fontSize: 10,
+    color: '#162D50',
+    fontWeight: '800',
+    marginTop: 4,
   },
+
   activeIndicator: {
     position: 'absolute',
-    top: -6,
-    width: 24,
+    bottom: 0,
+    width: 25,
     height: 3,
     backgroundColor: '#10B981',
-    borderRadius: 2,
+    borderRadius: 3,
   },
 });
