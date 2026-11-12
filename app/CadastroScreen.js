@@ -20,19 +20,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
-
-// IP IPv4 local da sua máquina
+// API pública do FinanceControl
 const API_BASE_URL =
-  'http://172.20.10.2:8080/api/usuarios';
+  'https://financecontrol-5bg3.onrender.com/api/usuarios';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
-
 export default function CadastroScreen() {
   const router = useRouter();
 
