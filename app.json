@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "ProjetoMobile",
@@ -15,7 +16,8 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "br.com.faama.financecontrol"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -23,6 +25,16 @@
     "plugins": [
       "expo-router",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "a5d455a8-2970-4b18-9787-43d21e859b12"
+      }
+    }
   }
 }

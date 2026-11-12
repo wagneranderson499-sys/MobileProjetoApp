@@ -99,57 +99,63 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+try {
+  const response = await api.post('/login', {
+    email: email.trim(),
+    senha,
+  });
 
-    try {
-      const response = await api.post('/login', {
-        email: email.trim(),
-        senha,
-      });
+  const usuarioLogado = response.data;
 
-      const usuarioLogado = response.data;
+  await AsyncStorage.setItem(
+    '@usuario_logado',
+    JSON.stringify(usuarioLogado)
+  );
 
-      await AsyncStorage.setItem(
-        '@usuario_logado',
-        JSON.stringify(usuarioLogado)
-      );
+  Alert.alert(
+    'Sucesso!',
+    `Bem-vindo(a), ${usuarioLogado.nome || 'de volta'}!`,
+    [
+      {
+        text: 'OK',
+        onPress: () =>
+          router.push({
+            pathname: '/DashboardScreen',
+            params: {
+              usuario: JSON.stringify(usuarioLogado),
+            },
+          }),
+      },
+    ]
+  );
 
-      Alert.alert(
-        'Sucesso!',
-        `Bem-vindo(a), ${usuarioLogado.nome || 'de volta'}!`,
-        [
-          {
-            text: 'OK',
-            onPress: () =>
-              router.push({
-                pathname: '/DashboardScreen',
-                params: {
-                  usuario: JSON.stringify(usuarioLogado),
-                },
-              }),
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Erro de Login:', error);
+} catch (error) {
+  console.log('STATUS:', error.response?.status);
+  console.log('RESPOSTA DO BACKEND:', error.response?.data);
 
-      if (
-        error.response?.status === 401 ||
-        error.response?.status === 404
-      ) {
-        Alert.alert(
-          'Erro no Login',
-          'E-mail ou senha incorretos.'
-        );
-      } else {
-        Alert.alert(
-          'Erro de Conexão',
-          'Não foi possível conectar ao servidor em http://172.20.10.2:8080. Verifique se o backend está rodando e se o celular está no mesmo Wi-Fi.'
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
+  const status = error.response?.status;
+
+  if (status === 400 || status === 401) {
+    Alert.alert(
+      'Erro no Login',
+      error.response?.data?.message ||
+        'E-mail ou senha incorretos.'
+    );
+  } else if (!error.response) {
+    Alert.alert(
+      'Erro de Conexão',
+      'Não foi possível conectar ao servidor.'
+    );
+  } else {
+    Alert.alert(
+      'Erro',
+      'Não foi possível realizar o login.'
+    );
   }
+
+} finally {
+  setLoading(false);
+}}
 
   // ===================================================
   // ETAPA 1 — ENVIAR CÓDIGO DE RECUPERAÇÃO
