@@ -24,7 +24,13 @@ export function CategoryProvider({ children }) {
       try {
         const salvas = await AsyncStorage.getItem('@categorias_app');
         if (salvas !== null) {
-          setCategorias(JSON.parse(salvas));
+          const armazenadas = JSON.parse(salvas);
+          if (Array.isArray(armazenadas) && armazenadas.length > 0) {
+            setCategorias(armazenadas);
+          } else {
+            setCategorias(CATEGORIAS_PADRAO);
+            await AsyncStorage.setItem('@categorias_app', JSON.stringify(CATEGORIAS_PADRAO));
+          }
         } else {
           setCategorias(CATEGORIAS_PADRAO);
           await AsyncStorage.setItem('@categorias_app', JSON.stringify(CATEGORIAS_PADRAO));
@@ -61,9 +67,12 @@ export function CategoryProvider({ children }) {
 
   // EXCLUIR
   const removerCategoria = (id) => {
+    if (categorias.length <= 1) return false;
     const atualizadas = categorias.filter((cat) => cat.id !== id);
+    if (atualizadas.length === categorias.length) return false;
     setCategorias(atualizadas);
     salvarCategorias(atualizadas);
+    return true;
   };
 
   // EDITAR / ATUALIZAR
