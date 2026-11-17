@@ -333,6 +333,8 @@ export default function DashboardScreen() {
             Visão geral
           </Text>
 
+          <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 12 }}>Saldo acumulado até este mês: {formatarMoeda(saldoAcumulado)}</Text>
+
           {/* CARD DO SALDO */}
           <View style={styles.balanceCard}>
             <View style={styles.balanceHeader}>
