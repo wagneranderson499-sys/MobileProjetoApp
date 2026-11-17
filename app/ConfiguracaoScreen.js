@@ -25,11 +25,13 @@ import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCategorias } from '../context/CategoryContext';
 import api from '../Services/api';
+import * as Notifications from 'expo-notifications';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ConfiguracaoScreen() {
   const insets = useSafeAreaInsets();
-  const [notificacoes, setNotificacoes] = useState(true);
+  const [notificacoes, setNotificacoes] = useState(false);
+  const [salvandoNotificacoes, setSalvandoNotificacoes] = useState(false);
 
   // Dados do Usuário Logado
   const [usuario, setUsuario] = useState(null);
@@ -68,6 +70,8 @@ export default function ConfiguracaoScreen() {
             const user = JSON.parse(userJson);
 
             setUsuario(user);
+            const notificacoesSalvas = await AsyncStorage.getItem(`@notificacoes_user_${user.id}`);
+            setNotificacoes(notificacoesSalvas === 'true');
             const fotoSalva = user.id != null
               ? await AsyncStorage.getItem(`@foto_perfil_user_${user.id}`)
               : null;
@@ -111,6 +115,58 @@ export default function ConfiguracaoScreen() {
     } catch (error) {
       console.error('Erro ao escolher foto de perfil:', error);
       Alert.alert('Erro', 'Não foi possível salvar a foto. Tente uma imagem menor.');
+    }
+  };
+
+  const handleNotificacoes = async (ativar) => {
+    if (salvandoNotificacoes || usuario?.id == null) return;
+    setSalvandoNotificacoes(true);
+    const chave = `@notificacoes_user_${usuario.id}`;
+    const chaveAgendamento = `@notificacao_id_user_${usuario.id}`;
+    try {
+      const idAnterior = await AsyncStorage.getItem(chaveAgendamento);
+      if (!ativar) {
+        if (idAnterior) await Notifications.cancelScheduledNotificationAsync(idAnterior);
+        await AsyncStorage.removeItem(chaveAgendamento);
+        await AsyncStorage.setItem(chave, 'false');
+        setNotificacoes(false);
+        return;
+      }
+      const atual = await Notifications.getPermissionsAsync();
+      const permissao = atual.granted ? atual : await Notifications.requestPermissionsAsync();
+      if (!permissao.granted) {
+        Alert.alert('Notificações desativadas', 'Permita as notificações nas configurações do celular para receber os lembretes.');
+        return;
+      }
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('lembretes-financecontrol', {
+          name: 'Lembretes financeiros',
+          importance: Notifications.AndroidImportance.DEFAULT,
+        });
+      }
+      if (idAnterior) await Notifications.cancelScheduledNotificationAsync(idAnterior);
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'FinanceControl',
+          body: 'Que tal registrar seus lançamentos financeiros de hoje?',
+          sound: 'default',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 20,
+          minute: 0,
+          ...(Platform.OS === 'android' ? { channelId: 'lembretes-financecontrol' } : {}),
+        },
+      });
+      await AsyncStorage.setItem(chaveAgendamento, id);
+      await AsyncStorage.setItem(chave, 'true');
+      setNotificacoes(true);
+      Alert.alert('Lembrete ativado', 'Você receberá um lembrete diário às 20h, conforme as permissões do aparelho.');
+    } catch (error) {
+      console.error('Erro ao configurar notificações:', error);
+      Alert.alert('Erro', 'Não foi possível configurar as notificações neste aparelho.');
+    } finally {
+      setSalvandoNotificacoes(false);
     }
   };
 
@@ -468,14 +524,15 @@ export default function ConfiguracaoScreen() {
                 </Text>
 
                 <Text style={styles.optionSubtext}>
-                  Receba avisos do aplicativo
+                  Lembrete diário às 20h
                 </Text>
               </View>
             </View>
 
             <Switch
               value={notificacoes}
-              onValueChange={setNotificacoes}
+              onValueChange={handleNotificacoes}
+              disabled={salvandoNotificacoes || !usuario?.id}
               trackColor={{
                 false: '#CBD5E1',
                 true: '#10B981',
