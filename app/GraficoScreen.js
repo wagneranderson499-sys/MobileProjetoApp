@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTransactions } from '../context/TransactionContext';
@@ -275,6 +275,7 @@ function criarSegmentosDonut(categorias, total) {
 // =====================================================
 
 export default function GraficosScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const contexto = useTransactions();
@@ -726,7 +727,7 @@ export default function GraficosScreen() {
       </ScrollView>
 
       {/* BARRA INFERIOR */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: 5 + insets.bottom }]}>
         <TouchableOpacity
           style={styles.tabItem}
           activeOpacity={0.7}
