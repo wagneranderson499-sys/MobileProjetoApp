@@ -6,9 +6,9 @@ export const chaveMesAtual = () => { const d = new Date(); return `${d.getFullYe
 export function chaveDaTransacao(data) {
   if (typeof data !== 'string') return null;
   const s = data.trim();
-  let m = /^(\\d{2})\\/(\\d{2})\\/(\\d{4})$/.exec(s);
+  let m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
   if (m) { const dia=Number(m[1]), mes=Number(m[2]), ano=Number(m[3]); const d=new Date(ano,mes-1,dia); return d.getFullYear()===ano && d.getMonth()===mes-1 && d.getDate()===dia ? `${ano}-${m[2]}` : null; }
-  m = /^(\\d{4})-(\\d{2})-(\\d{2})/.exec(s);
+  m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (m) { const ano=Number(m[1]), mes=Number(m[2]), dia=Number(m[3]); const d=new Date(ano,mes-1,dia); return d.getFullYear()===ano && d.getMonth()===mes-1 && d.getDate()===dia ? `${m[1]}-${m[2]}` : null; }
   return null;
 }
