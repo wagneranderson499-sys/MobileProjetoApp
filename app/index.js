@@ -1,83 +1,68 @@
-
-import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Image, StatusBar, StyleSheet, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+// Rota inicial: aparece somente ao abrir o aplicativo.
+export default function Abertura() {
+  const opacidade = useRef(new Animated.Value(0)).current;
+  const escala = useRef(new Animated.Value(0.94)).current;
+  const [destino, setDestino] = useState(null);
 
-// Import das telas de autenticação e apresentação
-import HomeScreen from './HomeScreen';
-import CadastroScreen from './CadastroScreen';
-import LoginScreen from './LoginScreen';
+  useEffect(() => {
+    let ativo = true;
+    Animated.parallel([
+      Animated.timing(opacidade, { toValue: 1, duration: 650, useNativeDriver: true }),
+      Animated.spring(escala, { toValue: 1, friction: 7, useNativeDriver: true }),
+    ]).start();
 
-// Import das telas internas do aplicativo (com Bottom Tabs)
-import DashboardScreen from './DashboardScreen';
+    async function iniciar() {
+      let proximaTela = '/HomeScreen';
+      try {
+        const sessao = await AsyncStorage.getItem('@usuario_logado');
+        const usuario = sessao ? JSON.parse(sessao) : null;
+        if (usuario && typeof usuario === 'object' && (usuario.id || usuario.email)) {
+          proximaTela = '/DashboardScreen';
+        }
+      } catch (erro) {
+        console.warn('Não foi possível recuperar a sessão:', erro);
+      }
+      if (ativo) setDestino(proximaTela);
+    }
+    iniciar();
+    return () => { ativo = false; };
+  }, [opacidade, escala]);
 
+  useEffect(() => {
+    if (!destino) return;
+    const timer = setTimeout(() => router.replace(destino), 2000);
+    return () => clearTimeout(timer);
+  }, [destino]);
 
-
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
-
-// Componente que gerencia o Menu Inferior (Bottom Tabs)
-function MainTabNavigator() {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: '#10B981', // Verde esmeralda para o ícone ativo
-        tabBarInactiveTintColor: '#64748B', // Cinza para o inativo
-        tabBarStyle: {
-          backgroundColor: '#162D50', // Azul marinho do tema
-          borderTopColor: '#1E3A8A',
-          height: 65,
-          paddingBottom: 10,
-          paddingTop: 8,
-        },
-        tabBarIcon: ({ color, size, focused }) => {
-          let iconName;
-
-          if (route.name === 'Início') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Histórico') {
-            iconName = focused ? 'time' : 'time-outline';
-          } else if (route.name === 'Relatórios') {
-            iconName = focused ? 'stats-chart' : 'stats-chart-outline';
-          } else if (route.name === 'Configurações') {
-            iconName = focused ? 'settings' : 'settings-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-      })}
-    >
-      <Tab.Screen name="Início" component={DashboardScreen} />
-      <Tab.Screen name="Gráfico" component={GraficoScreen} />
-      <Tab.Screen name="Configurações" component={ConfiguraçõesScreen} />
-    </Tab.Navigator>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#102A4C" />
+      <Animated.View style={[styles.centro, { opacity: opacidade, transform: [{ scale: escala }] }]}>
+        <Image source={require('../assets/icon.png')} style={styles.logo} resizeMode="contain" />
+        <Text style={styles.titulo}>Finance<Text style={styles.destaque}>Control</Text></Text>
+        <Text style={styles.subtitulo}>Sua gestão financeira simplificada</Text>
+      </Animated.View>
+      <View style={styles.rodape}>
+        <Ionicons name="wallet-outline" size={17} color="#34D399" />
+        <Text style={styles.carregando}>Preparando suas finanças...</Text>
+      </View>
+    </View>
   );
 }
 
-// Navegação Raiz (Stack principal)
-export default function App() {
-  return (
-    <NavigationContainer>
-      <StatusBar style="light" backgroundColor="#162D50" />
-
-      <Stack.Navigator 
-        initialRouteName="Home"
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        {/* Fluxo Externo (Apresentação e Auth) */}
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Cadastro" component={CadastroScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-
-        {/* Fluxo Interno (App Principal com Menu Inferior) */}
-        <Stack.Screen name="MainApp" component={MainTabNavigator} />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
-}
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#102A4C', alignItems: 'center', justifyContent: 'center' },
+  centro: { alignItems: 'center', paddingHorizontal: 24 },
+  logo: { width: 118, height: 118, borderRadius: 24, marginBottom: 22 },
+  titulo: { color: '#FFFFFF', fontSize: 30, fontWeight: '800' },
+  destaque: { color: '#34D399' },
+  subtitulo: { color: '#CBD5E1', fontSize: 13, marginTop: 10, textAlign: 'center' },
+  rodape: { position: 'absolute', bottom: 64, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  carregando: { color: '#CBD5E1', fontSize: 12 },
+});
