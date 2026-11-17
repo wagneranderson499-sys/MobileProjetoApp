@@ -25,7 +25,8 @@
     "react-native-svg": "15.16.0",
     "react-native-vector-icons": "^10.3.0",
     "expo-image-picker": "~18.0.0",
-    "expo-notifications": "*"
+    "expo-notifications": "*",
+    "expo-splash-screen": "*"
   },
   "scripts": {
     "start": "cross-env EXPO_ROUTER_DISABLE_RN_NAVIGATION_CHECK=1 expo start",
