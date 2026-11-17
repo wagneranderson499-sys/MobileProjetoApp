@@ -19,6 +19,7 @@ import { Feather } from '@expo/vector-icons';
 import api from '../Services/api';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTransactions } from '../context/TransactionContext';
 
 // =====================================================
 // COMPONENTE DE CAMPO
@@ -84,6 +85,7 @@ export default function LoginScreen() {
     useState(false);
 
   const router = useRouter();
+  const { carregarTransacoes } = useTransactions();
 
   // ===================================================
   // LOGIN
@@ -106,11 +108,15 @@ try {
   });
 
   const usuarioLogado = response.data;
+  if (!usuarioLogado || typeof usuarioLogado !== 'object' || !(usuarioLogado.id || usuarioLogado.email)) {
+    throw new Error('Login retornou uma conta sem identificador.');
+  }
 
   await AsyncStorage.setItem(
     '@usuario_logado',
     JSON.stringify(usuarioLogado)
   );
+  await carregarTransacoes();
 
   Alert.alert(
     'Sucesso!',
@@ -119,7 +125,7 @@ try {
       {
         text: 'OK',
         onPress: () =>
-          router.push({
+          router.replace({
             pathname: '/DashboardScreen',
             params: {
               usuario: JSON.stringify(usuarioLogado),
