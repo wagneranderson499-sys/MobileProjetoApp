@@ -23,9 +23,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useTransactions } from '../context/TransactionContext';
 import { useCategorias } from '../context/CategoryContext';
+import { usePeriodo, chaveDaTransacao } from '../context/PeriodoContext';
+import SeletorMes from '../components/SeletorMes';
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
+  const { periodo } = usePeriodo();
+  const transacoesMes = transacoes.filter(item => chaveDaTransacao(item.data) === periodo);
+  const saldoAcumulado = transacoes.filter(item => { const mes = chaveDaTransacao(item.data); return mes && mes <= periodo; }).reduce((total,item) => total + (item.tipo === 'receita' ? 1 : -1) * Number(item.valor || 0),0);
   const [usuario, setUsuario] = useState(null);
   const [verificandoSessao, setVerificandoSessao] = useState(true);
 
@@ -73,7 +78,7 @@ export default function DashboardScreen() {
 
   const nomeUsuario = usuario?.nome || 'Usuário';
 
-  const totalReceitas = transacoes
+  const totalReceitas = transacoesMes
     .filter((item) => item.tipo === 'receita')
     .reduce(
       (total, item) =>
@@ -81,7 +86,7 @@ export default function DashboardScreen() {
       0
     );
 
-  const totalDespesas = transacoes
+  const totalDespesas = transacoesMes
     .filter((item) => item.tipo === 'despesa')
     .reduce(
       (total, item) =>
@@ -261,7 +266,7 @@ export default function DashboardScreen() {
   };
 
   const transacoesRecentes = [
-    ...transacoes,
+    ...transacoesMes,
   ]
     .reverse()
     .slice(0, 5);
@@ -322,10 +327,13 @@ export default function DashboardScreen() {
             styles.scrollContent
           }
         >
+          <SeletorMes />
           {/* VISÃO GERAL */}
           <Text style={styles.sectionTitle}>
             Visão geral
           </Text>
+
+          <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 12 }}>Saldo acumulado até este mês: {formatarMoeda(saldoAcumulado)}</Text>
 
           {/* CARD DO SALDO */}
           <View style={styles.balanceCard}>
@@ -334,7 +342,7 @@ export default function DashboardScreen() {
                 <Text
                   style={styles.balanceLabel}
                 >
-                  SALDO TOTAL
+                  RESULTADO DO MÊS
                 </Text>
 
                 <Text

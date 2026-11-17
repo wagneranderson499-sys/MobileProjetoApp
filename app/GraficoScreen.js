@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,11 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTransactions } from '../context/TransactionContext';
+import { usePeriodo, chaveDaTransacao, nomeMes } from '../context/PeriodoContext';
+import SeletorMes from '../components/SeletorMes';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 const DEFINICAO_CATEGORIAS = [
   {
@@ -277,6 +282,8 @@ function criarSegmentosDonut(categorias, total) {
 export default function GraficosScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { periodo } = usePeriodo();
+  const [exportando, setExportando] = useState(false);
 
   const contexto = useTransactions();
 
@@ -284,12 +291,31 @@ export default function GraficosScreen() {
     ? contexto.transacoes
     : [];
 
+  const transacoesMes = transacoes.filter(item => chaveDaTransacao(item.data) === periodo);
+  const receitasMes = transacoesMes.filter(item => item.tipo === 'receita').reduce((v,item)=>v+Number(item.valor||0),0);
+  const despesasMes = transacoesMes.filter(item => item.tipo === 'despesa').reduce((v,item)=>v+Number(item.valor||0),0);
+  const escaparHtml = valor => String(valor ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  async function exportarPdf() {
+    if (exportando) return;
+    setExportando(true);
+    try {
+      const linhas = transacoesMes.map(item => `<tr><td>${escaparHtml(item.data)}</td><td>${escaparHtml(item.descricao)}</td><td>${escaparHtml(item.categoria || '—')}</td><td>${escaparHtml(item.tipo)}</td><td style="text-align:right">${formatarMoeda(item.valor)}</td></tr>`).join('');
+      const categorias = [...new Set(transacoesMes.filter(t=>t.tipo==='despesa').map(t=>t.categoria||'Outros'))];
+      const linhasCategorias = categorias.map(cat=>`<tr><td>${escaparHtml(cat)}</td><td style="text-align:right">${formatarMoeda(transacoesMes.filter(t=>t.tipo==='despesa' && (t.categoria||'Outros')===cat).reduce((v,t)=>v+Number(t.valor||0),0))}</td></tr>`).join('');
+      const html = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial;padding:26px;color:#162D50}h1{font-size:25px}h2{margin-top:30px;font-size:17px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px 5px;border-bottom:1px solid #ddd;text-align:left}th{background:#e8eff5}.resumo{background:#f1f5f9;padding:18px;border-radius:8px}small{color:#64748b}</style></head><body><h1>FinanceControl</h1><p>Relatório financeiro — ${escaparHtml(nomeMes(periodo))}</p><small>Gerado em ${new Date().toLocaleDateString('pt-BR')}</small><div class="resumo"><p>Receitas: <b>${formatarMoeda(receitasMes)}</b></p><p>Despesas: <b>${formatarMoeda(despesasMes)}</b></p><p>Resultado do mês: <b>${formatarMoeda(receitasMes-despesasMes)}</b></p></div><h2>Despesas por categoria</h2><table><tr><th>Categoria</th><th>Valor</th></tr>${linhasCategorias || '<tr><td colspan="2">Nenhuma despesa</td></tr>'}</table><h2>Movimentações</h2><table><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr>${linhas || '<tr><td colspan="5">Nenhuma movimentação neste mês</td></tr>'}</table></body></html>`;
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri,{mimeType:'application/pdf',dialogTitle:'Exportar relatório de '+nomeMes(periodo),UTI:'com.adobe.pdf'});
+      else Alert.alert('PDF gerado','O compartilhamento de arquivos não está disponível neste dispositivo.');
+    } catch(e) { console.error(e); Alert.alert('Erro','Não foi possível gerar o relatório em PDF.'); }
+    finally { setExportando(false); }
+  }
+
   // ===================================================
   // 1. FILTRA E NORMALIZA AS DESPESAS
   // ===================================================
 
   const apenasDespesas = useMemo(() => {
-    return transacoes
+    return transacoesMes
       .map((transacao) => {
         const tipoNormalizado = normalizarTexto(
           transacao?.tipo ??
@@ -339,7 +365,7 @@ export default function GraficosScreen() {
           transacao.ehDespesa &&
           transacao.valorCalculado > 0
       );
-  }, [transacoes]);
+  }, [transacoesMes]);
 
   // ===================================================
   // 2. TOTAL GERAL DOS GASTOS
@@ -447,6 +473,7 @@ export default function GraficosScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
+        <SeletorMes />
         {/* GRÁFICO CIRCULAR */}
         <View style={styles.whiteCard}>
           <View style={styles.cardHeader}>
@@ -724,6 +751,7 @@ export default function GraficosScreen() {
             ))
           )}
         </View>
+        <TouchableOpacity onPress={exportarPdf} disabled={exportando} style={{backgroundColor:'#162D50',borderRadius:14,padding:17,marginTop:18,marginBottom:22,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10}}><Ionicons name="document-text-outline" size={20} color="#FFFFFF"/><Text style={{color:'#FFFFFF',fontWeight:'700',fontSize:15}}>{exportando?'Gerando PDF...':'Exportar relatório em PDF'}</Text></TouchableOpacity>
       </ScrollView>
 
       {/* BARRA INFERIOR */}
