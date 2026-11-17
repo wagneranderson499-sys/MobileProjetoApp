@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,6 +25,7 @@ import { useTransactions } from '../context/TransactionContext';
 import { useCategorias } from '../context/CategoryContext';
 
 export default function DashboardScreen() {
+  const insets = useSafeAreaInsets();
   const [usuario, setUsuario] = useState(null);
   const [verificandoSessao, setVerificandoSessao] = useState(true);
 
@@ -690,7 +691,7 @@ export default function DashboardScreen() {
             BARRA INFERIOR
             IDÊNTICA À TELA DE GRÁFICOS
         ===================================================== */}
-        <View style={styles.tabBar}>
+        <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: 5 + insets.bottom }]}>
 
           {/* INÍCIO - ATIVO */}
           <TouchableOpacity
@@ -1212,7 +1213,7 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 105,
+    paddingBottom: 105 + insets.bottom,
   },
 
   /* ============================================================
