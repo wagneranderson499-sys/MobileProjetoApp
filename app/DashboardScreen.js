@@ -1213,7 +1213,7 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 105 + insets.bottom,
+    paddingBottom: 105,
   },
 
   /* ============================================================
