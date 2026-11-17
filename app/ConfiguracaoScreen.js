@@ -25,6 +25,7 @@ import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCategorias } from '../context/CategoryContext';
 import api from '../Services/api';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ConfiguracaoScreen() {
   const insets = useSafeAreaInsets();
@@ -37,6 +38,7 @@ export default function ConfiguracaoScreen() {
   const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
   const [nomeEdit, setNomeEdit] = useState('');
   const [emailEdit, setEmailEdit] = useState('');
+  const [fotoPerfil, setFotoPerfil] = useState(null);
 
   // Modal de Alteração de Senha
   const [modalSenhaVisible, setModalSenhaVisible] = useState(false);
@@ -66,6 +68,10 @@ export default function ConfiguracaoScreen() {
             const user = JSON.parse(userJson);
 
             setUsuario(user);
+            const fotoSalva = user.id != null
+              ? await AsyncStorage.getItem(`@foto_perfil_user_${user.id}`)
+              : null;
+            setFotoPerfil(fotoSalva);
             setNomeEdit(user.nome || '');
             setEmailEdit(user.email || '');
           }
@@ -77,6 +83,36 @@ export default function ConfiguracaoScreen() {
       carregarUsuario();
     }, [])
   );
+
+  // Foto armazenada localmente por conta, sem alterar a foto de outros usuários.
+  const handleEscolherFoto = async () => {
+    if (usuario?.id == null) {
+      Alert.alert('Atenção', 'Entre na sua conta para adicionar uma foto.');
+      return;
+    }
+    try {
+      const permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissao.granted) {
+        Alert.alert('Permissão necessária', 'Autorize o acesso às fotos para escolher uma imagem.');
+        return;
+      }
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.45,
+        base64: true,
+      });
+      if (resultado.canceled || !resultado.assets?.[0]?.base64) return;
+      const asset = resultado.assets[0];
+      const foto = `data:image/jpeg;base64,${asset.base64}`;
+      await AsyncStorage.setItem(`@foto_perfil_user_${usuario.id}`, foto);
+      setFotoPerfil(foto);
+    } catch (error) {
+      console.error('Erro ao escolher foto de perfil:', error);
+      Alert.alert('Erro', 'Não foi possível salvar a foto. Tente uma imagem menor.');
+    }
+  };
 
   // Salvar alteração do nome
   const handleSalvarPerfil = async () => {
@@ -214,6 +250,10 @@ export default function ConfiguracaoScreen() {
 
   // Remover Categoria
   const handleRemover = (id, nome) => {
+    if (categorias.length <= 1) {
+      Alert.alert('Categoria obrigatória', 'É necessário manter pelo menos uma categoria cadastrada.');
+      return;
+    }
     Alert.alert(
       'Excluir Categoria',
       `Deseja remover a categoria "${nome}"?`,
@@ -295,14 +335,17 @@ export default function ConfiguracaoScreen() {
       >
         {/* CARD PERFIL */}
         <View style={styles.profileCard}>
-          <Image
-            source={{
-              uri: `https://avatar.iran.liara.run/public/username?username=${
-                usuario?.nome || 'User'
-              }`,
-            }}
-            style={styles.avatar}
-          />
+          <TouchableOpacity onPress={handleEscolherFoto} accessibilityLabel="Alterar foto de perfil">
+            <Image
+              source={{
+                uri: fotoPerfil || `https://avatar.iran.liara.run/public/username?username=${encodeURIComponent(usuario?.nome || 'User')}`,
+              }}
+              style={styles.avatar}
+            />
+            <View style={styles.avatarCamera}>
+              <Ionicons name="camera" size={12} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
 
           <View style={styles.profileInfo}>
             <Text style={styles.userName}>
@@ -513,6 +556,11 @@ export default function ConfiguracaoScreen() {
                     />
                   </TouchableOpacity>
                 </View>
+
+                <TouchableOpacity onPress={handleEscolherFoto} style={styles.photoButton}>
+                  <Ionicons name="camera-outline" size={19} color="#162D50" />
+                  <Text style={styles.photoButtonText}>Escolher foto da galeria</Text>
+                </TouchableOpacity>
 
                 <Text style={styles.fieldLabel}>
                   Nome
@@ -951,6 +999,28 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 16,
+  },
+  avatarCamera: {
+    position: 'absolute',
+    bottom: -3,
+    right: -3,
+    backgroundColor: '#162D50',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  photoButtonText: {
+    color: '#162D50',
+    fontWeight: '700',
   },
 
   profileInfo: {
