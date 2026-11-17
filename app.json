@@ -48,6 +48,7 @@
       "visible": "sticky-immersive",
       "barStyle": "dark-content",
       "backgroundColor": "#FFFFFF"
-    }
+    },
+    "scheme": "financecontrol"
   }
 }
