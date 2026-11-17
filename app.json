@@ -23,7 +23,16 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#102A4C",
+          "image": "./assets/icon.png",
+          "imageWidth": 130,
+          "resizeMode": "contain"
+        }
+      ]
     ],
     "extra": {
       "router": {
