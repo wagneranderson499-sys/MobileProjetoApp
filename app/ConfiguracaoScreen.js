@@ -19,7 +19,7 @@ import {
   Keyboard,
 } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,6 +27,7 @@ import { useCategorias } from '../context/CategoryContext';
 import api from '../Services/api';
 
 export default function ConfiguracaoScreen() {
+  const insets = useSafeAreaInsets();
   const [notificacoes, setNotificacoes] = useState(true);
 
   // Dados do Usuário Logado
@@ -812,7 +813,7 @@ export default function ConfiguracaoScreen() {
       </Modal>
 
       {/* TAB BAR */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: 5 + insets.bottom }]}>
         {/* INÍCIO */}
         <TouchableOpacity
           style={styles.tabItem}
