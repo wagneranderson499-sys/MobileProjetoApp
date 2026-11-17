@@ -87,33 +87,12 @@ export default function CadastroScreen() {
 
       const dadosUsuario = response.data;
 
+      // Cadastro não autentica a sessão. Exigir login impede reutilizar
+      // a conta anterior que esteja salva neste mesmo aparelho.
       Alert.alert(
-        'Sucesso',
-        dadosUsuario?.message ||
-          'Conta criada com sucesso!',
-        [
-          {
-            text: 'Acessar Painel',
-            onPress: () => {
-              router.replace({
-                pathname: '/DashboardScreen',
-                params: {
-                  usuario: JSON.stringify({
-                    id: dadosUsuario.id,
-                    nome:
-                      dadosUsuario.nome ||
-                      nome.trim(),
-                    email:
-                      dadosUsuario.email ||
-                      email.trim(),
-                    saldo:
-                      dadosUsuario.saldo ?? 0.0,
-                  }),
-                },
-              });
-            },
-          },
-        ]
+        'Conta criada!',
+        'Cadastro realizado. Entre com seu e-mail e senha para acessar seus dados.',
+        [{ text: 'Ir para login', onPress: () => router.replace('/LoginScreen') }]
       );
     } catch (error) {
       setCarregando(false);
