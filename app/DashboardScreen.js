@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 
 import {
   StyleSheet,
@@ -13,20 +13,26 @@ import {
   Platform,
   Keyboard,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useTransactions } from '../context/TransactionContext';
 import { useCategorias } from '../context/CategoryContext';
 
 export default function DashboardScreen() {
-  const params = useLocalSearchParams();
+  const [usuario, setUsuario] = useState(null);
+  const [verificandoSessao, setVerificandoSessao] = useState(true);
 
   const {
     transacoes,
+    loading: carregandoTransacoes,
+    userId,
+    carregarTransacoes,
     adicionarTransacao,
     removerTransacao,
   } = useTransactions();
@@ -40,23 +46,31 @@ export default function DashboardScreen() {
   const [categoriaSelecionada, setCategoriaSelecionada] =
     useState(null);
 
-  let usuario = null;
+  useFocusEffect(useCallback(() => {
+    let ativo = true;
+    setVerificandoSessao(true);
+    setUsuario(null);
+    (async () => {
+      try {
+        const salvo = await AsyncStorage.getItem('@usuario_logado');
+        const conta = salvo ? JSON.parse(salvo) : null;
+        if (!conta || typeof conta !== 'object' || !(conta.id || conta.email)) {
+          if (ativo) router.replace('/LoginScreen');
+          return;
+        }
+        await carregarTransacoes();
+        if (ativo) setUsuario(conta);
+      } catch (error) {
+        console.error('Erro ao verificar sessão:', error);
+        if (ativo) router.replace('/LoginScreen');
+      } finally {
+        if (ativo) setVerificandoSessao(false);
+      }
+    })();
+    return () => { ativo = false; };
+  }, []));
 
-  try {
-    if (params.usuario) {
-      usuario =
-        typeof params.usuario === 'string'
-          ? JSON.parse(params.usuario)
-          : params.usuario;
-    }
-  } catch (error) {
-    console.error('Erro ao ler usuário:', error);
-  }
-
-  const nomeUsuario =
-    usuario?.nome ||
-    params.nome ||
-    'Anderson Wagner';
+  const nomeUsuario = usuario?.nome || 'Usuário';
 
   const totalReceitas = transacoes
     .filter((item) => item.tipo === 'receita')
@@ -250,6 +264,15 @@ export default function DashboardScreen() {
   ]
     .reverse()
     .slice(0, 5);
+
+  if (verificandoSessao || carregandoTransacoes || !usuario || !userId) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#162D50" />
+        <Text>Carregando sua conta...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
