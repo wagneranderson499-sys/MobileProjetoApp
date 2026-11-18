@@ -723,7 +723,7 @@ export default function DashboardScreen() {
               <Ionicons
                 name="home"
                 size={21}
-                color="#162D50"
+                color={escuro ? "#DCE7F5" : "#162D50"}
               />
             </View>
 
