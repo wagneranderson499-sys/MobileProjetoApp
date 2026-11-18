@@ -16,6 +16,7 @@ export const corTema = (cor, escuro, propriedade = 'color') => {
   if (!escuro || typeof cor !== 'string') return cor;
   const chave = cor.toUpperCase();
   if (chave === '#FFFFFF' && propriedade === 'color') return '#FFFFFF';
+  if (chave === '#162D50' && propriedade === 'backgroundColor') return '#25466B';
   return CORES[chave] || cor;
 };
 export function estilosTema(base, escuro) {
