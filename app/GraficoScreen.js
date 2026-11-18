@@ -476,7 +476,7 @@ export default function GraficosScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        <SeletorMes />
+        <SeletorMes apenasMesesComDespesas />
         {/* GRÁFICO CIRCULAR */}
         <View style={styles.whiteCard}>
           <View style={styles.cardHeader}>
