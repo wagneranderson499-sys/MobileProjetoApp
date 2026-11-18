@@ -1,3 +1,4 @@
+import { useTema, estilosTema } from '../context/ThemeContext';
 import React, { useState, useCallback } from 'react';
 
 import {
@@ -29,6 +30,8 @@ import * as Notifications from 'expo-notifications';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ConfiguracaoScreen() {
+  const { escuro, modo, alterarModo } = useTema();
+  const styles = React.useMemo(() => estilosTema(baseStyles, escuro), [escuro]);
   const insets = useSafeAreaInsets();
   const [notificacoes, setNotificacoes] = useState(false);
   const [salvandoNotificacoes, setSalvandoNotificacoes] = useState(false);
@@ -358,7 +361,7 @@ export default function ConfiguracaoScreen() {
       edges={['top', 'left', 'right']}
     >
       <StatusBar
-        barStyle="dark-content"
+        barStyle={escuro ? 'light-content' : 'dark-content'}
         backgroundColor="#F8FAFC"
       />
 
@@ -539,6 +542,30 @@ export default function ConfiguracaoScreen() {
               }}
               thumbColor="#FFFFFF"
             />
+          </View>
+        </View>
+
+        <View style={styles.optionsCard}>
+          <View style={styles.optionRow}>
+            <View style={styles.optionLeft}>
+              <View style={styles.optionIcon}>
+                <Ionicons name={escuro ? 'moon-outline' : 'sunny-outline'} size={20} color={escuro ? '#E8EFF9' : '#162D50'} />
+              </View>
+              <View>
+                <Text style={styles.optionText}>Aparência</Text>
+                <Text style={styles.optionSubtext}>Escolha o tema do aplicativo</Text>
+              </View>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingBottom: 14, gap: 7 }}>
+            {[['claro','Claro'],['escuro','Escuro'],['automatico','Automático']].map(([valor,rotulo]) => (
+              <TouchableOpacity key={valor} accessibilityRole="button" accessibilityState={{ selected: modo === valor }} onPress={() => alterarModo(valor)}
+                style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 11, borderRadius: 10,
+                  backgroundColor: modo === valor ? (escuro ? '#3A5576' : '#E8EEF5') : (escuro ? '#202D40' : '#F8FAFC'),
+                  borderWidth: 1, borderColor: modo === valor ? (escuro ? '#8FA2B9' : '#162D50') : (escuro ? '#35465C' : '#E2E8F0') }}>
+                <Text style={{ fontSize: 12, fontWeight: modo === valor ? '700' : '500', color: escuro ? '#E8EFF9' : '#162D50' }}>{rotulo}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
@@ -984,7 +1011,7 @@ export default function ConfiguracaoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   // TELA
   container: {
     flex: 1,
