@@ -38,6 +38,8 @@ function CampoIcone({
   autoFocus = false,
   maxLength,
 }) {
+  const { escuro } = useTema();
+  const styles = React.useMemo(() => estilosTema(baseStyles, escuro), [escuro]);
   return (
     <View style={styles.inputContainer}>
       <Feather
