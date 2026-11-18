@@ -423,6 +423,18 @@ export default function DashboardScreen() {
             Adicionar lançamento
           </Text>
 
+          <TouchableOpacity
+            onPress={() => router.push('/EscanearComprovante')}
+            style={{ backgroundColor: '#E6F7EF', borderRadius: 14, padding: 15, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <Ionicons name="scan-outline" size={23} color="#167347" />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#14532D', fontWeight: '800' }}>Escanear comprovante (teste)</Text>
+              <Text style={{ color: '#475569', fontSize: 12 }}>Foto ou galeria, revise antes de salvar</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#167347" />
+          </TouchableOpacity>
+
           <View style={styles.actionsRow}>
             {/* RECEITA */}
             <TouchableOpacity
