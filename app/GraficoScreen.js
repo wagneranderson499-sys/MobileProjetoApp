@@ -1,3 +1,4 @@
+import { useTema, estilosTema } from '../context/ThemeContext';
 import React, { useMemo, useState } from 'react';
 import {
   StyleSheet,
@@ -280,6 +281,8 @@ function criarSegmentosDonut(categorias, total) {
 // =====================================================
 
 export default function GraficosScreen() {
+  const { escuro } = useTema();
+  const styles = React.useMemo(() => estilosTema(baseStyles, escuro), [escuro]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { periodo } = usePeriodo();
@@ -442,7 +445,7 @@ export default function GraficosScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar
-        barStyle="dark-content"
+        barStyle={escuro ? 'light-content' : 'dark-content'}
         backgroundColor="#F8FAFC"
       />
 
@@ -822,7 +825,7 @@ export default function GraficosScreen() {
 // ESTILOS
 // =====================================================
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F8FAFC',
