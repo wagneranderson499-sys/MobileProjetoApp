@@ -456,7 +456,7 @@ export default function GraficosScreen() {
             <Ionicons
               name="stats-chart"
               size={21}
-              color="#162D50"
+              color={escuro ? '#DCE7F5' : '#162D50'}
             />
           </View>
 
@@ -494,7 +494,7 @@ export default function GraficosScreen() {
               <Ionicons
                 name="pie-chart-outline"
                 size={21}
-                color="#162D50"
+                color={escuro ? '#DCE7F5' : '#162D50'}
               />
             </View>
           </View>
@@ -610,7 +610,7 @@ export default function GraficosScreen() {
             <Ionicons
               name="bar-chart-outline"
               size={19}
-              color="#162D50"
+              color={escuro ? '#DCE7F5' : '#162D50'}
             />
           </View>
         </View>
@@ -788,7 +788,7 @@ export default function GraficosScreen() {
             <Ionicons
               name="stats-chart"
               size={21}
-              color="#162D50"
+              color={escuro ? '#DCE7F5' : '#162D50'}
             />
           </View>
 
