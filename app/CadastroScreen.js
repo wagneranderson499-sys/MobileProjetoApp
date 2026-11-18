@@ -1,3 +1,4 @@
+import { useTema, estilosTema } from '../context/ThemeContext';
 import React, { useState } from 'react';
 
 import {
@@ -32,6 +33,8 @@ const api = axios.create({
   },
 });
 export default function CadastroScreen() {
+  const { escuro } = useTema();
+  const styles = React.useMemo(() => estilosTema(baseStyles, escuro), [escuro]);
   const router = useRouter();
 
   // ==============================
@@ -574,7 +577,7 @@ export default function CadastroScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   // ==============================
   // TELA
   // ==============================
