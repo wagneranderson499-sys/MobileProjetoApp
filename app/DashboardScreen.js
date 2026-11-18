@@ -1,3 +1,4 @@
+import { useTema, estilosTema } from '../context/ThemeContext';
 import React, { useState, useCallback } from 'react';
 
 import {
@@ -27,6 +28,8 @@ import { usePeriodo, chaveDaTransacao } from '../context/PeriodoContext';
 import SeletorMes from '../components/SeletorMes';
 
 export default function DashboardScreen() {
+  const { escuro } = useTema();
+  const styles = React.useMemo(() => estilosTema(baseStyles, escuro), [escuro]);
   const insets = useSafeAreaInsets();
   const { periodo } = usePeriodo();
   const [usuario, setUsuario] = useState(null);
@@ -287,7 +290,7 @@ export default function DashboardScreen() {
       edges={['top', 'left', 'right']}
     >
       <StatusBar
-        barStyle="dark-content"
+        barStyle={escuro ? 'light-content' : 'dark-content'}
         backgroundColor="#FFFFFF"
       />
 
@@ -1165,7 +1168,7 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   /* ============================================================
      TELA
   ============================================================ */
