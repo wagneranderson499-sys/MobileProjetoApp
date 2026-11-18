@@ -1,5 +1,6 @@
 // app/_layout.js
 import React from 'react';
+import { ThemeProvider } from '../context/ThemeContext';
 import { Stack } from 'expo-router';
 
 // 1. Verifique se a importação está exatamente assim com chaves { CategoryProvider }:
@@ -9,6 +10,7 @@ import { TransactionProvider } from '../context/TransactionContext';
 
 export default function Layout() {
   return (
+    <ThemeProvider>
     <CategoryProvider>
       <PeriodoProvider>
       <TransactionProvider>
@@ -16,5 +18,6 @@ export default function Layout() {
       </TransactionProvider>
       </PeriodoProvider>
     </CategoryProvider>
+    </ThemeProvider>
   );
 }
