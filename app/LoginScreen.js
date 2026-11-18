@@ -1,3 +1,4 @@
+import { useTema, estilosTema } from '../context/ThemeContext';
 import React, { useState } from 'react';
 
 import {
@@ -68,6 +69,8 @@ function CampoIcone({
 // =====================================================
 
 export default function LoginScreen() {
+  const { escuro } = useTema();
+  const styles = React.useMemo(() => estilosTema(baseStyles, escuro), [escuro]);
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
@@ -836,7 +839,7 @@ try {
 // ESTILOS
 // =====================================================
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
