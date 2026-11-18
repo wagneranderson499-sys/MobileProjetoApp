@@ -22,6 +22,6 @@ export default function SeletorMes() {
   );
 }
 const styles=StyleSheet.create({
-  linha:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:'#FFFFFF',borderRadius:14,padding:10,marginBottom:16,borderWidth:1,borderColor:'#E2E8F0'},
-  botao:{padding:10},centro:{alignItems:'center'},rotulo:{fontSize:10,color:'#64748B',fontWeight:'700',letterSpacing:0.5},mes:{fontSize:16,fontWeight:'800',color:'#162D50',marginTop:3}
+  linha:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:'transparent',paddingVertical:8,paddingHorizontal:2,marginBottom:12},
+  botao:{padding:10},centro:{alignItems:'center'},rotulo:{fontSize:10,color:'#94A3B8',fontWeight:'500',letterSpacing:0.4},mes:{fontSize:16,fontWeight:'600',color:'#162D50',marginTop:3}
 });
