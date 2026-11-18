@@ -29,8 +29,6 @@ import SeletorMes from '../components/SeletorMes';
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { periodo } = usePeriodo();
-  const transacoesMes = transacoes.filter(item => chaveDaTransacao(item.data) === periodo);
-  const saldoAcumulado = transacoes.filter(item => { const mes = chaveDaTransacao(item.data); return mes && mes <= periodo; }).reduce((total,item) => total + (item.tipo === 'receita' ? 1 : -1) * Number(item.valor || 0),0);
   const [usuario, setUsuario] = useState(null);
   const [verificandoSessao, setVerificandoSessao] = useState(true);
 
@@ -42,6 +40,9 @@ export default function DashboardScreen() {
     adicionarTransacao,
     removerTransacao,
   } = useTransactions();
+
+  const transacoesMes = transacoes.filter(item => chaveDaTransacao(item.data) === periodo);
+  const saldoAcumulado = transacoes.filter(item => { const mes = chaveDaTransacao(item.data); return mes && mes <= periodo; }).reduce((total,item) => total + (item.tipo === 'receita' ? 1 : -1) * Number(item.valor || 0),0);
 
   const { categorias } = useCategorias();
 
