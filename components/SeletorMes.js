@@ -9,7 +9,7 @@ export default function SeletorMes() {
   return (
     <View style={styles.linha}>
       <TouchableOpacity accessibilityLabel="Mês anterior" onPress={() => setPeriodo(moverMes(periodo,-1))} style={styles.botao}>
-        <Ionicons name="chevron-back" size={20} color="#162D50" />
+        <Ionicons name="chevron-back" size={16} color="#162D50" />
       </TouchableOpacity>
       <View style={styles.centro}>
         <Text style={styles.rotulo}>PERÍODO SELECIONADO</Text>
@@ -22,6 +22,6 @@ export default function SeletorMes() {
   );
 }
 const styles=StyleSheet.create({
-  linha:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:'transparent',paddingVertical:8,paddingHorizontal:2,marginBottom:12},
-  botao:{padding:10},centro:{alignItems:'center'},rotulo:{fontSize:10,color:'#94A3B8',fontWeight:'500',letterSpacing:0.4},mes:{fontSize:16,fontWeight:'600',color:'#162D50',marginTop:3}
+  linha:{flexDirection:'row',alignItems:'center',justifyContent:'center',backgroundColor:'transparent',paddingVertical:2,marginBottom:8,gap:12},
+  botao:{padding:5},centro:{alignItems:'center',minWidth:135},rotulo:{fontSize:9,color:'#94A3B8',fontWeight:'500',letterSpacing:0.2},mes:{fontSize:13,fontWeight:'600',color:'#162D50',marginTop:1}
 });
