@@ -372,7 +372,7 @@ export default function ConfiguracaoScreen() {
             <Ionicons
               name="settings-outline"
               size={21}
-              color="#162D50"
+              color={escuro ? '#DCE7F5' : '#162D50'}
             />
           </View>
 
@@ -425,7 +425,7 @@ export default function ConfiguracaoScreen() {
             <Ionicons
               name="pencil-outline"
               size={18}
-              color="#162D50"
+              color={escuro ? '#DCE7F5' : '#162D50'}
             />
           </TouchableOpacity>
         </View>
@@ -447,7 +447,7 @@ export default function ConfiguracaoScreen() {
                 <Ionicons
                   name="pricetags-outline"
                   size={20}
-                  color="#162D50"
+                  color={escuro ? '#DCE7F5' : '#162D50'}
                 />
               </View>
 
@@ -482,7 +482,7 @@ export default function ConfiguracaoScreen() {
                 <Ionicons
                   name="key-outline"
                   size={20}
-                  color="#162D50"
+                  color={escuro ? '#DCE7F5' : '#162D50'}
                 />
               </View>
 
@@ -517,7 +517,7 @@ export default function ConfiguracaoScreen() {
                 <Ionicons
                   name="notifications-outline"
                   size={20}
-                  color="#162D50"
+                  color={escuro ? '#DCE7F5' : '#162D50'}
                 />
               </View>
 
@@ -612,7 +612,7 @@ export default function ConfiguracaoScreen() {
                       <Ionicons
                         name="person-outline"
                         size={21}
-                        color="#162D50"
+                        color={escuro ? '#DCE7F5' : '#162D50'}
                       />
                     </View>
 
@@ -642,7 +642,7 @@ export default function ConfiguracaoScreen() {
                 </View>
 
                 <TouchableOpacity onPress={handleEscolherFoto} style={styles.photoButton}>
-                  <Ionicons name="camera-outline" size={19} color="#162D50" />
+                  <Ionicons name="camera-outline" size={19} color={escuro ? '#DCE7F5' : '#162D50'} />
                   <Text style={styles.photoButtonText}>Escolher foto da galeria</Text>
                 </TouchableOpacity>
 
@@ -714,7 +714,7 @@ export default function ConfiguracaoScreen() {
                     <Ionicons
                       name="pricetags-outline"
                       size={21}
-                      color="#162D50"
+                      color={escuro ? '#DCE7F5' : '#162D50'}
                     />
                   </View>
 
@@ -794,7 +794,7 @@ export default function ConfiguracaoScreen() {
                             'pricetag-outline'
                           }
                           size={18}
-                          color="#162D50"
+                          color={escuro ? '#DCE7F5' : '#162D50'}
                         />
                       </View>
 
@@ -856,7 +856,7 @@ export default function ConfiguracaoScreen() {
                       <Ionicons
                         name="key-outline"
                         size={21}
-                        color="#162D50"
+                        color={escuro ? '#DCE7F5' : '#162D50'}
                       />
                     </View>
 
@@ -996,7 +996,7 @@ export default function ConfiguracaoScreen() {
             <Ionicons
               name="settings"
               size={21}
-              color="#162D50"
+              color={escuro ? '#DCE7F5' : '#162D50'}
             />
           </View>
 
