@@ -111,13 +111,25 @@ function resolverCategoria(valorCategoria) {
   return nome || 'Outros';
 }
 
-const CORES_CATEGORIAS = ['#EF4444', '#3B82F6', '#F59E0B', '#8B5CF6', '#10B981', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
-function corDaCategoria(nome) {
-  const predefinida = DEFINICAO_CATEGORIAS.find(item => normalizarTexto(item.nome) === normalizarTexto(nome));
-  if (predefinida) return predefinida.cor;
-  let hash = 0;
-  for (const caractere of normalizarTexto(nome)) hash = ((hash * 31) + caractere.charCodeAt(0)) >>> 0;
-  return CORES_CATEGORIAS[hash % CORES_CATEGORIAS.length];
+// Paleta expandida: cores distintas para cada categoria visível.
+// A ordenação alfabética mantém a atribuição estável quando os valores mudam.
+const CORES_CATEGORIAS = [
+  '#EF4444', '#3B82F6', '#F59E0B', '#8B5CF6', '#10B981',
+  '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1',
+  '#14B8A6', '#E11D48', '#A855F7', '#65A30D', '#0EA5E9',
+  '#D97706', '#DB2777', '#059669', '#7C3AED', '#DC2626',
+];
+function criarMapaDeCores(nomes) {
+  const mapa = new Map();
+  const ordenados = [...new Set(nomes.map(normalizarTexto))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  ordenados.forEach((nome, indice) => {
+    // Para mais categorias do que a paleta, gera novos tons sem repetir a cor.
+    const cor = indice < CORES_CATEGORIAS.length
+      ? CORES_CATEGORIAS[indice]
+      : `hsl(${(indice * 137.508) % 360}, ${60 + (Math.floor(indice / 360) % 3) * 8}%, ${40 + (Math.floor(indice / 1080) % 3) * 8}%)`;
+    mapa.set(nome, cor);
+  });
+  return mapa;
 }
 
 // =====================================================
@@ -346,11 +358,12 @@ export default function GraficosScreen() {
       if (!agrupadas.has(chave)) agrupadas.set(chave, { nome, itens: [] });
       agrupadas.get(chave).itens.push(transacao);
     });
+    const coresPorNome = criarMapaDeCores([...agrupadas.values()].map(item => item.nome));
     return [...agrupadas.values()]
       .map(({ nome, itens: itensCategoria }) => {
         const categoria = {
           nome,
-          cor: corDaCategoria(nome),
+          cor: coresPorNome.get(normalizarTexto(nome)),
           icone: categorias.find(item => normalizarTexto(item.nome) === normalizarTexto(nome))?.icone || DEFINICAO_CATEGORIAS.find(item => normalizarTexto(item.nome) === normalizarTexto(nome))?.icone || 'pricetag-outline',
         };
 
