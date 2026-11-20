@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTransactions } from '../context/TransactionContext';
+import { useCategorias } from '../context/CategoryContext';
 
 // OCR experimental: requer expo-text-extractor e uma development build.
 // Nenhuma imagem é enviada ao backend ou a serviços externos.
@@ -28,12 +29,13 @@ function dataHoje() {
 }
 export default function EscanearComprovante() {
   const { adicionarTransacao } = useTransactions();
+  const { categorias } = useCategorias();
   const [ocupado,setOcupado] = useState(false);
   const [texto,setTexto] = useState('');
   const [valor,setValor] = useState('');
   const [descricao,setDescricao] = useState('');
   const [data,setData] = useState(dataHoje());
-  const [categoria,setCategoria] = useState('Outros');
+  const [categoria,setCategoria] = useState(null);
 
   async function selecionar(camera) {
     try {
@@ -67,9 +69,12 @@ export default function EscanearComprovante() {
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(data)) {
       Alert.alert('Data inválida','Use o formato DD/MM/AAAA.'); return;
     }
+    if (!categoria) {
+      Alert.alert('Selecione uma categoria', 'Escolha uma das categorias disponíveis antes de salvar.'); return;
+    }
     setOcupado(true);
     try {
-      await adicionarTransacao({id:Date.now().toString(),tipo:'despesa',valor:numero,descricao:descricao.trim(),data,categoria:categoria.trim()||'Outros',icone:'arrow-down-outline'});
+      await adicionarTransacao({id:Date.now().toString(),tipo:'despesa',valor:numero,descricao:descricao.trim(),data,categoria:categoria.nome,icone:'arrow-down-outline'});
       Alert.alert('Despesa salva','O comprovante foi registrado como despesa.',[{text:'OK',onPress:()=>router.back()}]);
     } catch(e) { Alert.alert('Erro','Não foi possível salvar a despesa.'); }
     finally { setOcupado(false); }
@@ -83,7 +88,26 @@ export default function EscanearComprovante() {
     <Text style={s.rotulo}>Valor (R$)</Text><TextInput style={s.campo} keyboardType="decimal-pad" value={valor} onChangeText={setValor} placeholder="0,00"/>
     <Text style={s.rotulo}>Descrição</Text><TextInput style={s.campo} value={descricao} onChangeText={setDescricao} placeholder="Ex.: Compra no mercado"/>
     <Text style={s.rotulo}>Data (DD/MM/AAAA)</Text><TextInput style={s.campo} value={data} onChangeText={setData} placeholder="DD/MM/AAAA"/>
-    <Text style={s.rotulo}>Categoria</Text><TextInput style={s.campo} value={categoria} onChangeText={setCategoria} placeholder="Outros"/>
+    <Text style={s.rotulo}>Categoria</Text>
+    <Text style={s.ajudaCategoria}>Toque em uma das categorias cadastradas para selecionar.</Text>
+    <View style={s.categorias}>
+      {Array.isArray(categorias) && categorias.length > 0 ? categorias.map((item) => {
+        const selecionada = categoria?.id === item.id;
+        return (
+          <TouchableOpacity
+            key={String(item.id ?? item.nome)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: selecionada }}
+            onPress={() => setCategoria(item)}
+            style={[s.categoriaOpcao, selecionada && s.categoriaSelecionada]}
+          >
+            <Ionicons name={item.icone || 'pricetag-outline'} size={17} color={selecionada ? '#FFFFFF' : '#102A4C'} />
+            <Text style={[s.categoriaTexto, selecionada && s.categoriaTextoSelecionada]}>{item.nome}</Text>
+            {selecionada && <Ionicons name="checkmark-circle" size={17} color="#FFFFFF" />}
+          </TouchableOpacity>
+        );
+      }) : <Text style={s.ajudaCategoria}>Nenhuma categoria disponível. Cadastre uma categoria antes de salvar.</Text>}
+    </View>
     {texto ? <><Text style={s.rotulo}>Texto reconhecido (para conferência)</Text><Text style={s.ocr}>{texto.slice(0,3000)}</Text></> : null}
     <TouchableOpacity style={s.botao} disabled={ocupado} onPress={salvar}><Ionicons name="checkmark-circle-outline" size={21} color="#fff"/><Text style={s.botaoTexto}>Confirmar e salvar despesa</Text></TouchableOpacity>
     <Text style={s.rodape}>Leitura experimental. Nenhum lançamento é salvo automaticamente.</Text>
@@ -95,5 +119,11 @@ const s=StyleSheet.create({
   info:{fontSize:14,color:'#475569',lineHeight:21,marginBottom:18},botao:{backgroundColor:'#102A4C',borderRadius:13,padding:15,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10,marginBottom:11},
   secundario:{backgroundColor:'#E2E8F0'},botaoTexto:{color:'#fff',fontWeight:'700',fontSize:15},
   rotulo:{fontWeight:'700',color:'#334155',marginTop:15,marginBottom:6},campo:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:11,backgroundColor:'#fff',padding:13,color:'#0F172A'},
+  ajudaCategoria:{color:'#64748B',fontSize:12,marginBottom:10},
+  categorias:{flexDirection:'row',flexWrap:'wrap',gap:9,marginBottom:5},
+  categoriaOpcao:{flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:12,paddingVertical:11,borderRadius:11,borderWidth:1,borderColor:'#CBD5E1',backgroundColor:'#FFFFFF'},
+  categoriaSelecionada:{backgroundColor:'#102A4C',borderColor:'#102A4C'},
+  categoriaTexto:{fontSize:13,color:'#102A4C',fontWeight:'600'},
+  categoriaTextoSelecionada:{color:'#FFFFFF'},
   ocr:{backgroundColor:'#E2E8F0',padding:12,borderRadius:10,color:'#334155',fontSize:12},rodape:{textAlign:'center',color:'#64748B',marginTop:12,fontSize:12}
 });
