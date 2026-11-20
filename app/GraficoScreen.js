@@ -13,6 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTransactions } from '../context/TransactionContext';
+import { useCategorias } from '../context/CategoryContext';
 import { usePeriodo, chaveDaTransacao, nomeMes } from '../context/PeriodoContext';
 import SeletorMes from '../components/SeletorMes';
 import * as Print from 'expo-print';
@@ -103,70 +104,20 @@ function converterValor(valor) {
 // IDENTIFICAÇÃO DAS CATEGORIAS
 // =====================================================
 
+// Preserva o nome registrado na transação, mesmo se a categoria foi excluída
+// posteriormente. Apenas categorias realmente vazias entram em "Outros".
 function resolverCategoria(valorCategoria) {
-  const categoria = normalizarTexto(valorCategoria);
+  const nome = String(valorCategoria ?? '').trim();
+  return nome || 'Outros';
+}
 
-  if (!categoria) {
-    return 'Outros';
-  }
-
-  if (
-    categoria.includes('aliment') ||
-    categoria.includes('mercado') ||
-    categoria.includes('supermerc') ||
-    categoria.includes('restaurante') ||
-    categoria.includes('comida') ||
-    categoria.includes('lanche')
-  ) {
-    return 'Alimentação';
-  }
-
-  if (
-    categoria.includes('transport') ||
-    categoria.includes('combust') ||
-    categoria.includes('gasolina') ||
-    categoria.includes('uber') ||
-    categoria.includes('onibus') ||
-    categoria.includes('passagem')
-  ) {
-    return 'Transporte';
-  }
-
-  if (
-    categoria.includes('conta') ||
-    categoria.includes('agua') ||
-    categoria.includes('luz') ||
-    categoria.includes('energia') ||
-    categoria.includes('internet') ||
-    categoria.includes('aluguel') ||
-    categoria.includes('moradia') ||
-    categoria.includes('telefone') ||
-    categoria.includes('fatura')
-  ) {
-    return 'Contas';
-  }
-
-  if (
-    categoria.includes('lazer') ||
-    categoria.includes('cinema') ||
-    categoria.includes('jogo') ||
-    categoria.includes('entreten') ||
-    categoria.includes('viagem') ||
-    categoria.includes('streaming') ||
-    categoria.includes('passeio') ||
-    categoria.includes('assinatura')
-  ) {
-    return 'Lazer';
-  }
-
-  const correspondencia = DEFINICAO_CATEGORIAS.find(
-    (item) =>
-      normalizarTexto(item.nome) === categoria
-  );
-
-  return correspondencia
-    ? correspondencia.nome
-    : 'Outros';
+const CORES_CATEGORIAS = ['#EF4444', '#3B82F6', '#F59E0B', '#8B5CF6', '#10B981', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
+function corDaCategoria(nome) {
+  const predefinida = DEFINICAO_CATEGORIAS.find(item => normalizarTexto(item.nome) === normalizarTexto(nome));
+  if (predefinida) return predefinida.cor;
+  let hash = 0;
+  for (const caractere of normalizarTexto(nome)) hash = ((hash * 31) + caractere.charCodeAt(0)) >>> 0;
+  return CORES_CATEGORIAS[hash % CORES_CATEGORIAS.length];
 }
 
 // =====================================================
@@ -286,6 +237,7 @@ export default function GraficosScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { periodo } = usePeriodo();
+  const { categorias } = useCategorias();
   const [exportando, setExportando] = useState(false);
 
   const contexto = useTransactions();
@@ -387,12 +339,20 @@ export default function GraficosScreen() {
   // ===================================================
 
   const categoriasCalculadas = useMemo(() => {
-    return DEFINICAO_CATEGORIAS
-      .map((categoria) => {
-        const itensCategoria = apenasDespesas.filter(
-          (transacao) =>
-            transacao.categoriaCalculada === categoria.nome
-        );
+    const agrupadas = new Map();
+    apenasDespesas.forEach((transacao) => {
+      const nome = transacao.categoriaCalculada;
+      const chave = normalizarTexto(nome);
+      if (!agrupadas.has(chave)) agrupadas.set(chave, { nome, itens: [] });
+      agrupadas.get(chave).itens.push(transacao);
+    });
+    return [...agrupadas.values()]
+      .map(({ nome, itens: itensCategoria }) => {
+        const categoria = {
+          nome,
+          cor: corDaCategoria(nome),
+          icone: categorias.find(item => normalizarTexto(item.nome) === normalizarTexto(nome))?.icone || DEFINICAO_CATEGORIAS.find(item => normalizarTexto(item.nome) === normalizarTexto(nome))?.icone || 'pricetag-outline',
+        };
 
         const totalCategoria = itensCategoria.reduce(
           (total, transacao) =>
@@ -423,7 +383,7 @@ export default function GraficosScreen() {
               )
             : 0,
       }));
-  }, [apenasDespesas, totalDespesasGeral]);
+  }, [apenasDespesas, totalDespesasGeral, categorias]);
 
   // ===================================================
   // 4. SEGMENTOS DO GRÁFICO CIRCULAR
