@@ -20,18 +20,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import axios from 'axios';
-// API pública do FinanceControl
-const API_BASE_URL =
-  'https://financecontrol-5bg3.onrender.com/api/usuarios';
+import api from '../Services/api';
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 60000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
 export default function CadastroScreen() {
   const { escuro } = useTema();
   const styles = React.useMemo(() => estilosTema(baseStyles, escuro), [escuro]);
@@ -109,7 +99,7 @@ export default function CadastroScreen() {
         Alert.alert(
           'Erro',
           error.response.data?.message ||
-            'Falha ao realizar cadastro.'
+            `Falha ao realizar cadastro (HTTP ${error.response.status}).`
         );
       } else if (
         error.code === 'ECONNABORTED'
@@ -121,7 +111,7 @@ export default function CadastroScreen() {
       } else {
         Alert.alert(
           'Erro de Conexão',
-          `Não foi possível conectar ao servidor (${API_BASE_URL}). Verifique se o dispositivo está no mesmo Wi-Fi que o seu computador.`
+          'Não foi possível conectar ao servidor público. Verifique sua internet e tente novamente.'
         );
       }
     }
